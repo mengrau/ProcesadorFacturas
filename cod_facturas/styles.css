@@ -1,0 +1,357 @@
+:root {
+  --fondo: #0f1724;
+  --tarjeta: #22222270;
+  --acento: #041a4b;
+  --desaprobado: #ffffff;
+}
+
+html, body {
+  height: 100%;
+  margin: 0;
+  font-family: Inter, Segoe UI, Roboto, Arial, sans-serif;
+  background:#041a4b;
+  color: #e6eef6;
+}
+
+.wrap {
+  max-width: 980px;
+  margin: 32px auto;
+  padding: 20px;
+}
+
+header {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+h1 {
+  margin: 0;
+  font-size: 20px;
+}
+
+p.introduccion {
+  margin: 0;
+  color: var(--desaprobado);
+  font-size: 13px;
+}
+
+.tarjeta {
+  background: var(--tarjeta);
+  border-radius: 12px;
+  padding: 18px;
+  box-shadow: 0 6px 18px rgba(2, 6, 23, 0.6);
+}
+
+.zona-de-arrastre {
+  border: 2px dashed rgba(255, 255, 255, 0.06);
+  border-radius: 10px;
+  padding: 28px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  min-height: 180px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.01), transparent);
+}
+
+.zona-de-arrastre.arrastrando {
+  border-color: var(--acento);
+  box-shadow: 0 8px 30px rgba(6, 182, 212, 0.08);
+}
+
+.zona-de-arrastre:hover {
+  border-color: rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.1);
+  box-shadow: 0 4px 20px rgba(255, 255, 255, 0.1);
+  transform: translateY(-2px);
+  transition: all 0.3s ease;
+}
+
+.zona-de-arrastre .sugerencia {
+  color: var(--desaprobado);
+  font-size: 14px;
+  transition: color 0.3s ease;
+}
+
+.zona-de-arrastre:hover .sugerencia {
+  color: #ffffff;
+}
+
+.zona-de-arrastre:hover strong {
+  color: #ffffff;
+  transition: color 0.3s ease;
+}
+
+.btn {
+  background: var(--acento);
+  color: #fff;
+  display: inline-block;
+  padding: 10px 14px;
+  border-radius: 8px;
+  font-weight: 600;
+  text-decoration: none;
+  cursor: pointer;
+  transition: transform 0.2s ease;
+}
+
+.btn:hover {
+  transform: scale(1.05);
+}
+
+.lista-de-archivos {
+  margin-top: 16px;
+}
+
+.fila-de-archivo {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px;
+  border-radius: 8px;
+  background: var(--tarjeta);
+  margin-bottom: 8px;
+}
+
+.fila-de-archivo .izquierda {
+  width: 40%;
+}
+
+.fila-de-archivo .derecha {
+  width: 50%;
+}
+
+.fila-de-archivo .eliminar-archivo {
+  width: 10%;
+  text-align: center;
+  cursor: pointer;
+}
+
+.fila-de-archivo small {
+  color: var(--desaprobado);
+}
+
+.progreso {
+  width: 100%;
+  height: 18px;
+  background: rgba(0,0,0,0.2);
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.barra {
+  height: 100%;
+  width: 0%;
+  background: var(--acento);
+  text-align: center;
+  color: #fff;
+  font-size: 12px;
+  line-height: 18px;
+  transition: width 0.3s ease;
+}
+
+footer {
+  margin-top: 14px;
+  color: var(--desaprobado);
+  font-size: 13px;
+}
+
+/* Estilos para archivos rechazados */
+.archivo-rechazado {
+  background: rgba(255, 68, 68, 0.15) !important;
+  border: 2px solid #ff4444 !important;
+  box-shadow: 0 4px 12px rgba(255, 68, 68, 0.2) !important;
+}
+
+.archivo-rechazado:hover {
+  background: rgba(255, 68, 68, 0.25) !important;
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(255, 68, 68, 0.3) !important;
+}
+
+.alerta-rechazados {
+  animation: slideIn 0.5s ease-out;
+}
+
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateY(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Estilos para el contenedor de archivos rechazados */
+.contenedor-rechazados-item {
+  transition: all 0.3s ease;
+  cursor: pointer;
+}
+
+.contenedor-rechazados-item:hover {
+  background: rgba(255, 68, 68, 0.2) !important;
+  transform: translateX(5px);
+}
+
+@media (max-width: 640px) {
+  .wrap {
+    padding: 10px;
+  }
+  
+  .alerta-rechazados {
+    padding: 15px !important;
+  }
+  
+  .alerta-rechazados h3 {
+    font-size: 16px !important;
+  }
+}
+
+/* Estilos para selector de aplicaciones */
+.app-selector {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 20px;
+  justify-content: center;
+}
+
+.btn-selector {
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+  padding: 8px 16px;
+  border-radius: 6px;
+  text-decoration: none;
+  font-size: 14px;
+  font-weight: 500;
+  transition: all 0.3s ease;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.btn-selector:hover {
+  background: rgba(255, 255, 255, 0.2);
+  transform: translateY(-1px);
+}
+
+.btn-selector.active {
+  background: linear-gradient(135deg, #041a4b, #0a2a5c);
+  border-color: #041a4b;
+  box-shadow: 0 2px 8px rgba(4, 26, 75, 0.3);
+}
+
+/* Estilos para modo de procesamiento */
+.modo-procesamiento {
+  margin-top: 16px;
+  background: rgba(255,255,255,0.1);
+}
+
+.modo-procesamiento h3 {
+  margin: 0 0 12px 0;
+  color: #fff;
+}
+
+.radio-group {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
+.radio-group label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+}
+
+.radio-group input[type="radio"] {
+  margin: 0;
+}
+
+.radio-group span {
+  color: #fff;
+}
+
+.modo-descripcion {
+  margin: 8px 0 0 0;
+  font-size: 12px;
+  color: rgba(255,255,255,0.7);
+}
+
+/* Estilos para zona de archivos */
+.zona-archivos {
+  margin-top: 16px;
+}
+
+.seleccionar-archivos {
+  cursor: pointer;
+  color: #fff;
+  text-decoration: underline;
+}
+
+.seleccionar-archivos:hover {
+  color: #ccc;
+}
+
+/* Estilos para contenedores y botones */
+.contenedor-rechazados {
+  display: none;
+  margin-top: 12px;
+}
+
+.lista-rechazados {
+  color: #ff4444;
+  font-size: 14px;
+}
+
+.botones-accion {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.btn-secundario {
+  background: transparent;
+  border: 1px solid #fff;
+  color: var(--desaprobado);
+}
+
+.btn-descarga {
+  display: none;
+  background: #041a4b;
+}
+
+.modo-indicador {
+  display: none;
+  margin-top: 8px;
+  padding: 8px 12px;
+  background: rgba(0, 150, 255, 0.1);
+  border-left: 3px solid #0096ff;
+  border-radius: 6px;
+  font-size: 12px;
+  color: #0096ff;
+}
+
+.estimador-tiempo {
+  display: none;
+  margin-top: 12px;
+  padding: 10px;
+}
+
+.estimador-tiempo p {
+  margin: 0;
+  color: #fff;
+  font-size: 14px;
+}
+
+.estimador-descripcion {
+  margin: 5px 0 0 0;
+  color: rgba(255,255,255,0.8);
+  font-size: 12px;
+}
+
+.tiempos-container {
+  margin-top: 10px;
+  color: rgb(255, 255, 255);
+}

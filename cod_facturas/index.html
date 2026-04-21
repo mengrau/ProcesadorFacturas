@@ -1,0 +1,677 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>FactuVal</title>
+  <link rel="stylesheet" href="/facturas/styles.css">
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <h1>FactuVal</h1>
+      <p class="introduccion">Arrastra uno o varios PDFs aquí para subirlos y procesarlos en el servidor</p>
+    </header>
+
+    <div class="tarjeta modo-procesamiento">
+      <h3>Modo de procesamiento</h3>
+      <div class="radio-group">
+        <label>
+          <input type="radio" name="modo" value="acumular" checked>
+          <span>Acumular facturas</span>
+        </label>
+        <label>
+          <input type="radio" name="modo" value="separado">
+          <span>Procesar por separado</span>
+        </label>
+      </div>
+      <p class="modo-descripcion">
+        <strong>Acumular:</strong> Las nuevas facturas se agregan al Excel existente<br>
+        <strong>Separado:</strong> Cada procesamiento sobrescribe el Excel
+      </p>
+    </div>
+
+    <div class="tarjeta zona-archivos">
+      <div id="zonaDeArrastre" class="zona-de-arrastre">
+        <div>
+          <strong>Arrastra archivos aquí</strong>
+          <div class="sugerencia">o <span id="abrirInput" class="seleccionar-archivos">selecciona archivos</span></div>
+        </div>
+        <input id="fileInput" type="file" accept="application/pdf" multiple style="display:none">
+      </div>
+
+      <div class="lista-de-archivos" id="filesList"></div>
+
+      <div id="contenedorRechazados" class="contenedor-rechazados">
+        <div id="listaRechazados" class="lista-rechazados"></div>
+      </div>
+
+      <div class="botones-accion">
+        <button id="uploadBtn" class="btn">Cargar</button>
+        <button id="clearBtn" class="btn btn-secundario">Limpiar</button>
+        <button id="downloadBtn" class="btn btn-descarga">Descargar resultados</button>
+      </div>
+      
+      <div id="modoIndicador" class="modo-indicador">
+        <strong>Modo seleccionado:</strong> <span id="modoTexto">Acumular facturas</span>
+      </div>
+
+      <div id="estimadorTiempo" class="estimador-tiempo">
+        <p>
+          <strong>Tiempo estimado:</strong> <span id="tiempoEstimado">calculando...</span>
+        </p>
+        <p class="estimador-descripcion">
+          Basado en el número de archivos y su contenido
+        </p>
+      </div>
+
+      <footer>
+        <div id="statusText">Esperando archivos...</div>
+        <div id="tiemposContainer" class="tiempos-container"></div>
+      </footer>
+    </div>
+  </div>
+
+  <script>
+    const zonaDeArrastre = document.getElementById('zonaDeArrastre');
+    const fileInput = document.getElementById('fileInput');
+    const listaDeArchivos = document.getElementById('filesList');
+    const uploadBtn = document.getElementById('uploadBtn');
+    const clearBtn = document.getElementById('clearBtn');
+    const downloadBtn = document.getElementById('downloadBtn');
+    const statusText = document.getElementById('statusText');
+    const abrirInput = document.getElementById('abrirInput');
+    const tiemposContainer = document.getElementById('tiemposContainer');
+    const modoTexto = document.getElementById('modoTexto');
+
+    let selectedFiles = [];
+    const LARGE_FILE_MB = 8;
+    const LARGE_FILE_BYTES = LARGE_FILE_MB * 1024 * 1024;
+    let deferredFiles = [];
+    let archivosRechazados = [];
+
+    function formatearTiempo(segundos) {
+      const horas = Math.floor(segundos / 3600);
+      const minutos = Math.floor((segundos % 3600) / 60);
+      const segs = Math.floor(segundos % 60);
+      
+      let resultado = '';
+      if (horas > 0) {
+        resultado += `${horas}h `;
+      }
+      if (minutos > 0 || horas > 0) {
+        resultado += `${minutos}min `;
+      }
+      resultado += `${segs}seg`;
+      
+      return resultado;
+    }
+
+    function actualizarModoIndicador() {
+      const modoSeleccionado = document.querySelector('input[name="modo"]:checked').value;
+      if (modoSeleccionado === 'acumular') {
+        modoTexto.textContent = 'Acumular facturas (se agregan al Excel existente)';
+      } else {
+        modoTexto.textContent = 'Procesar por separado (crea Excel nuevo)';
+      }
+    }
+
+    async function calcularTiempoEstimado() {
+      const estimadorTiempo = document.getElementById('estimadorTiempo');
+      const tiempoEstimado = document.getElementById('tiempoEstimado');
+      
+      if (selectedFiles.length === 0) {
+        estimadorTiempo.style.display = 'none';
+        return;
+      }
+
+      estimadorTiempo.style.display = 'block';
+      tiempoEstimado.textContent = 'calculando páginas...';
+
+      let tiempoTotal = 0;
+      let totalPaginas = 0;
+      
+      for (const file of selectedFiles) {
+        try {
+          const arrayBuffer = await file.arrayBuffer();
+          const uint8Array = new Uint8Array(arrayBuffer);
+          
+          let paginas = 1; 
+          let metodoUsado = "default";
+          
+    
+          const pdfText = new TextDecoder('latin1').decode(uint8Array);
+          const countMatches = pdfText.match(/\/Count\s+(\d+)/g);
+          
+          if (countMatches && countMatches.length > 0) {
+          
+            const lastMatch = countMatches[countMatches.length - 1];
+            const countMatch = lastMatch.match(/\/Count\s+(\d+)/);
+            if (countMatch) {
+              paginas = parseInt(countMatch[1]);
+              metodoUsado = "Count";
+            }
+          }
+          
+          if (paginas === 1) {
+            const pageMatches = pdfText.match(/\/Type\s*\/Page\b/g);
+            if (pageMatches && pageMatches.length > 0) {
+              paginas = pageMatches.length;
+              metodoUsado = "Type/Page";
+            }
+          }
+          
+          
+          if (paginas === 1) {
+            
+            const kidsMatches = pdfText.match(/\/Kids\s*\[/g);
+            if (kidsMatches && kidsMatches.length > 0) {
+              
+              const kidsContent = pdfText.match(/\/Kids\s*\[([^\]]+)\]/);
+              if (kidsContent) {
+                const pageRefs = kidsContent[1].match(/\d+\s+\d+\s+R/g);
+                if (pageRefs) {
+                  paginas = pageRefs.length;
+                  metodoUsado = "Kids";
+                }
+              }
+            }
+          }
+          
+          
+          if (paginas === 1) {
+            const pageCountMatch = pdfText.match(/\/PageCount\s+(\d+)/);
+            if (pageCountMatch) {
+              paginas = parseInt(pageCountMatch[1]);
+              metodoUsado = "PageCount";
+            }
+          }
+          
+          if (paginas === 1) {
+            const nMatches = pdfText.match(/\/N\s+(\d+)/g);
+            if (nMatches && nMatches.length > 0) {
+              let maxN = 1;
+              for (const match of nMatches) {
+                const nMatch = match.match(/\/N\s+(\d+)/);
+                if (nMatch) {
+                  const n = parseInt(nMatch[1]);
+                  if (n > maxN) maxN = n;
+                }
+              }
+              if (maxN > 1) {
+                paginas = maxN;
+                metodoUsado = "N";
+              }
+            }
+          }
+          
+          console.log(`Archivo: ${file.name}, Páginas detectadas: ${paginas} (método: ${metodoUsado})`);
+          
+          totalPaginas += paginas;
+          
+         
+          const tiempoPorArchivo = (paginas * 1.54) + 10; 
+          tiempoTotal += tiempoPorArchivo;
+          
+        } catch (error) {
+          console.log('Error al leer PDF:', error);
+          tiempoTotal += 300; 
+          totalPaginas += 50; 
+        }
+      }
+      
+      let mensajeTiempo = "";
+      if (tiempoTotal < 60) {
+        mensajeTiempo = `~${Math.ceil(tiempoTotal)} segundos (${selectedFiles.length} archivo${selectedFiles.length > 1 ? 's' : ''})`;
+      } else if (tiempoTotal < 3600) {
+        const minutos = Math.ceil(tiempoTotal / 60);
+        mensajeTiempo = `~${minutos} minuto${minutos > 1 ? 's' : ''} (${selectedFiles.length} archivo${selectedFiles.length > 1 ? 's' : ''})`;
+      } else {
+        const horas = Math.floor(tiempoTotal / 3600);
+        const minutos = Math.ceil((tiempoTotal % 3600) / 60);
+        if (minutos === 0) {
+          mensajeTiempo = `~${horas} hora${horas > 1 ? 's' : ''} (${selectedFiles.length} archivo${selectedFiles.length > 1 ? 's' : ''})`;
+        } else {
+          mensajeTiempo = `~${horas}h ${minutos}min (${selectedFiles.length} archivo${selectedFiles.length > 1 ? 's' : ''})`;
+        }
+      }
+      
+      
+      tiempoEstimado.textContent = mensajeTiempo;
+    }
+
+
+    function mostrarArchivosRechazados(archivosRechazados) {
+      const contenedorRechazados = document.getElementById("contenedorRechazados");
+      const listaRechazados = document.getElementById("listaRechazados");
+      
+      if (!contenedorRechazados || !listaRechazados) {
+        return;
+      }
+
+      if (archivosRechazados && archivosRechazados.length > 0) {
+          contenedorRechazados.style.display = "block";
+          
+          let texto = "";
+          archivosRechazados.forEach((rechazado, index) => {
+              texto += `• ${rechazado.archivo}: ${rechazado.razon || "No es una factura válida"}`;
+              if (index < archivosRechazados.length - 1) {
+                  texto += "<br>";
+              }
+          });
+          
+          listaRechazados.innerHTML = texto;
+      } else {
+          contenedorRechazados.style.display = "none";
+      }
+    }
+
+    function renderFiles(){
+      listaDeArchivos.innerHTML = '';
+      if(selectedFiles.length === 0){
+        statusText.textContent = 'Esperando archivos...';
+        return;
+      }
+      const diferidosMsg = deferredFiles.length > 0 ? ` | ${deferredFiles.length} archivo(s) pospuesto(s) por tamaño (> ${LARGE_FILE_MB} MB)` : '';
+      const rechazadosMsg = archivosRechazados.length > 0 ? ` | ${archivosRechazados.length} rechazado(s)` : '';
+      statusText.textContent = `${selectedFiles.length} archivo(s) listo(s) para subir${diferidosMsg}${rechazadosMsg}`;
+      selectedFiles.forEach((f, index) => {
+        const fila = document.createElement('div');
+        fila.className = 'fila-de-archivo';
+
+        const izquierda = document.createElement('div');
+        izquierda.className = 'izquierda';
+        
+        const archivoRechazado = archivosRechazados.find(ar => ar.archivo === f.name);
+        
+        if (archivoRechazado) {
+          fila.style.background = 'rgba(255, 68, 68, 0.15)';
+          fila.style.border = '2px solid #ff4444';
+          fila.style.boxShadow = '0 4px 12px rgba(255, 68, 68, 0.2)';
+          
+          izquierda.className = 'izquierda archivo-rechazado';
+          izquierda.style.position = 'relative';
+          izquierda.style.cursor = 'help';
+          izquierda.style.padding = '12px';
+          izquierda.title = `Error: ${archivoRechazado.razon}`;
+          izquierda.innerHTML = `
+            <strong style="color: #ff4444; font-size: 16px; display: block; margin-bottom: 4px;">${f.name}</strong>
+            <div style="color: #ff6666; font-size: 12px; margin-bottom: 4px;">${archivoRechazado.razon}</div>
+            <div><small style="color: #ccc; font-size: 11px;">${(f.size/1024).toFixed(1)} KB</small></div>
+          `;
+          
+          progreso.style.display = 'none';
+        } else {
+          fila.style.background = '';
+          fila.style.border = '';
+          fila.style.boxShadow = '';
+          
+          izquierda.className = 'izquierda';
+          izquierda.innerHTML = `
+            <strong style="color: #fff; font-size: 16px; display: block; margin-bottom: 4px;">${f.name}</strong>
+            <div><small style="color: #ccc; font-size: 12px;">${(f.size/1024).toFixed(1)} KB</small></div>
+          `;
+        }
+
+        const derecha = document.createElement('div');
+        derecha.className = 'derecha';
+
+        const progreso = document.createElement('div');
+        progreso.className = 'progreso';
+        const barra = document.createElement('div');
+        barra.className = 'barra';
+        
+        if (f._barra) {
+          barra.style.width = f._barra.style.width || '0%';
+          barra.textContent = f._barra.textContent || '0%';
+          barra.style.backgroundColor = f._barra.style.backgroundColor || '#041a4b';
+        }
+        
+        progreso.appendChild(barra);
+
+        const eliminarBtn = document.createElement('span');
+        eliminarBtn.textContent = 'X';
+        eliminarBtn.className = 'eliminar-archivo';
+        eliminarBtn.addEventListener('click', () => {
+          selectedFiles.splice(index, 1);
+          renderFiles();
+        });
+
+        derecha.appendChild(progreso);
+        fila.appendChild(izquierda);
+        fila.appendChild(derecha);
+        fila.appendChild(eliminarBtn); 
+        listaDeArchivos.appendChild(fila);
+
+        f._barra = barra;
+      });
+    }
+
+    function showConfirm(message, okText = 'Cargar ahora', cancelText = 'Cargar más tarde'){
+      return new Promise(resolve => {
+        let overlay = document.getElementById('simpleConfirmOverlay');
+        if(!overlay){
+          overlay = document.createElement('div');
+          overlay.id = 'simpleConfirmOverlay';
+          overlay.style.position = 'fixed';
+          overlay.style.inset = '0';
+          overlay.style.background = 'rgba(0,0,0,0.5)';
+          overlay.style.display = 'flex';
+          overlay.style.alignItems = 'center';
+          overlay.style.justifyContent = 'center';
+          overlay.style.zIndex = '9999';
+
+          const box = document.createElement('div');
+          box.style.background = 'rgba(12,22,46,0.98)';
+          box.style.border = '1px solid rgba(255,255,255,0.15)';
+          box.style.color = '#fff';
+          box.style.borderRadius = '10px';
+          box.style.maxWidth = '480px';
+          box.style.width = '92%';
+          box.style.padding = '18px';
+          box.style.boxShadow = '0 10px 30px rgba(0,0,0,0.35)';
+
+          const msg = document.createElement('div');
+          msg.id = 'simpleConfirmMessage';
+          msg.style.marginBottom = '14px';
+          msg.style.lineHeight = '1.5';
+          box.appendChild(msg);
+
+          const actions = document.createElement('div');
+          actions.style.display = 'flex';
+          actions.style.gap = '8px';
+          actions.style.justifyContent = 'flex-end';
+
+          const cancelBtn = document.createElement('button');
+          cancelBtn.className = 'btn';
+          cancelBtn.style.background = 'transparent';
+          cancelBtn.style.border = '1px solid #fff';
+          cancelBtn.id = 'simpleConfirmCancel';
+          const okBtn = document.createElement('button');
+          okBtn.className = 'btn';
+          okBtn.id = 'simpleConfirmOk';
+
+          actions.appendChild(cancelBtn);
+          actions.appendChild(okBtn);
+          box.appendChild(actions);
+          overlay.appendChild(box);
+          document.body.appendChild(overlay);
+        }
+
+        const msgEl = document.getElementById('simpleConfirmMessage');
+        const okEl = document.getElementById('simpleConfirmOk');
+        const cancelEl = document.getElementById('simpleConfirmCancel');
+        msgEl.textContent = message;
+        okEl.textContent = okText;
+        cancelEl.textContent = cancelText;
+
+        const cleanup = (result) => {
+          overlay.style.display = 'none';
+          okEl.onclick = null;
+          cancelEl.onclick = null;
+          resolve(result);
+        };
+
+        okEl.onclick = () => cleanup(true);
+        cancelEl.onclick = () => cleanup(false);
+        overlay.style.display = 'flex';
+      });
+    }
+
+    async function addFiles(files){
+      for(const f of files){
+        if(f.type !== 'application/pdf') continue;
+        if(f.size > LARGE_FILE_BYTES){
+        }
+        if(!selectedFiles.some(x => x.name === f.name && x.size === f.size)){
+          selectedFiles.push(f);
+        }
+      }
+      renderFiles();
+      await calcularTiempoEstimado();
+    }
+
+    const addFilesAsync = async (files) => {
+      for(const f of files){
+        if(f.type !== 'application/pdf') continue;
+        if(f.size > LARGE_FILE_BYTES){
+          const sizeMB = (f.size/1024/1024).toFixed(2);
+          const includeNow = await showConfirm(`"${f.name}" es un poco pesado (${sizeMB} MB). ¿Desea aun así cargar el archivo?\n\nSugerencia: cargue los archivos pesados por separado porque el programa puede demorar más de lo normal.`, 'Cargar ahora', 'Cargar más tarde');
+          if(!includeNow){
+            if(!deferredFiles.some(x => x.name === f.name && x.size === f.size)) deferredFiles.push(f);
+            continue;
+          }
+        }
+        if(!selectedFiles.some(x => x.name === f.name && x.size === f.size)) {
+          selectedFiles.push(f);
+        }
+      }
+      renderFiles();
+      await calcularTiempoEstimado();
+    };
+
+    ['dragenter','dragover'].forEach(evt => {
+      zonaDeArrastre.addEventListener(evt, e => { e.preventDefault(); e.stopPropagation(); zonaDeArrastre.classList.add('arrastrando'); });
+    });
+    ['dragleave','drop'].forEach(evt => {
+      zonaDeArrastre.addEventListener(evt, e => { e.preventDefault(); e.stopPropagation(); zonaDeArrastre.classList.remove('arrastrando'); });
+    });
+
+    zonaDeArrastre.addEventListener('drop', async e => {
+      const dt = e.dataTransfer;
+      if(dt && dt.files) await addFilesAsync(dt.files);
+    });
+
+    fileInput.addEventListener('change', async e => {
+      await addFilesAsync(e.target.files);
+      e.target.value = "";
+    });
+
+    zonaDeArrastre.addEventListener('click', () => fileInput.click());
+    abrirInput.addEventListener('click', (e) => { e.stopPropagation(); fileInput.click(); });
+
+    document.querySelectorAll('input[name="modo"]').forEach(radio => {
+      radio.addEventListener('change', actualizarModoIndicador);
+    });
+
+    uploadBtn.addEventListener('click', async () => {
+      if (selectedFiles.length === 0) {
+        
+        fileInput.click();
+        return;
+      }
+      
+      if(deferredFiles.length > 0){
+        const includeDeferred = confirm(`Tienes ${deferredFiles.length} archivo(s) pospuesto(s) por tamaño.\n\n¿Quieres incluirlos ahora en esta carga?`);
+        if(includeDeferred){
+          for(const f of deferredFiles){
+            if(!selectedFiles.some(x => x.name === f.name && x.size === f.size)){
+              selectedFiles.push(f);
+            }
+          }
+          deferredFiles = [];
+          renderFiles();
+        }
+      }
+      
+      downloadBtn.style.display = "none";
+      downloadBtn.dataset.filename = "";
+      tiemposContainer.innerHTML = "";
+      
+      statusText.textContent = 'Subiendo archivos...';
+      const uploadResult = await subirArchivosEnSerie(selectedFiles);
+      if (archivosRechazados && archivosRechazados.length > 0) {
+        statusText.textContent = `Subidos. ${archivosRechazados.length} rechazado(s). Procesando...`;
+      } else {
+        statusText.textContent = 'Archivos subidos. Procesando...';
+      }
+      
+      selectedFiles.forEach(f => {
+        if(f._barra){
+          f._barra.style.width = '100%';
+          f._barra.textContent = '100%';
+          f._barra.style.backgroundColor = '#041a4b';
+        }
+      });
+      
+      downloadBtn.style.display = "none";
+      downloadBtn.dataset.filename = "";
+      
+      if (uploadResult && uploadResult.processing_started) {
+        setTimeout(() => {
+          verificarResultado();
+        }, 1000);
+      } else {
+        verificarResultado();
+      }
+    });
+
+    async function subirArchivosEnSerie(files){
+      const inicioSubida = Date.now();
+      
+      const form = new FormData();
+      const modo = document.querySelector('input[name="modo"]:checked').value;
+      form.append('modo', modo);
+      
+      for(const f of files){
+        form.append('files', f, f.name);
+      }
+      
+      await new Promise((resolve, reject) => {
+        const xhr = new XMLHttpRequest();
+        xhr.open('POST', '/upload');
+
+        xhr.upload.onprogress = function(e){
+          if(e.lengthComputable){
+            const percent = Math.round((e.loaded/e.total)*100);
+            files.forEach(f => {
+              if(f._barra){
+                f._barra.style.width = percent + '%';
+                f._barra.textContent = percent + '%';
+                f._barra.style.backgroundColor = '#041a4b';
+              }
+            });
+          }
+        };
+
+        xhr.onload = () => {
+          const finSubida = Date.now();
+          const tiempoTotalSubida = (finSubida - inicioSubida) / 1000;
+          
+          files.forEach(f => {
+            if(f._barra){
+              f._barra.style.width = '100%';
+              f._barra.textContent = '100%';
+              f._barra.style.backgroundColor = '#041a4b';
+            }
+          });
+          
+          window.tiemposSubida = {
+            total: tiempoTotalSubida.toFixed(2)
+          };
+          
+          if (xhr.status >= 200 && xhr.status < 300) {
+            try {
+              const response = JSON.parse(xhr.responseText);
+              
+              if (response.archivos_rechazados && response.archivos_rechazados.length > 0) {
+                
+                archivosRechazados = response.archivos_rechazados;
+                mostrarArchivosRechazados(archivosRechazados);
+              }
+              
+              resolve(response);
+            } catch (e) {
+              console.error('[ERROR] Error al parsear respuesta:', e);
+              resolve({});
+            }
+          } else {
+            console.error('[ERROR] Status de error:', xhr.status);
+            reject();
+          }
+        };
+        xhr.onerror = (e) => {
+          console.error('[ERROR] Error en la petición:', e);
+          reject();
+        };
+        xhr.send(form);
+      });
+    }
+
+    clearBtn.addEventListener('click', async () => { 
+      selectedFiles = []; 
+      deferredFiles = []; 
+      archivosRechazados = [];
+      renderFiles(); 
+      tiemposContainer.innerHTML = ""; 
+      downloadBtn.style.display = "none";
+      downloadBtn.dataset.filename = "";
+      
+      const contenedorRechazados = document.getElementById("contenedorRechazados");
+      if (contenedorRechazados) {
+        contenedorRechazados.style.display = "none";
+      }
+      
+      await calcularTiempoEstimado();
+      
+      actualizarModoIndicador();
+    });
+
+
+    async function verificarResultado(){
+      try {
+        if (!window.inicioProcesamiento) {
+          window.inicioProcesamiento = Date.now();
+        }
+
+        const res = await fetch("/resultado");
+        const data = await res.json();
+
+        if(data.status === "done"){
+          archivosRechazados = data.archivos_rechazados || [];
+
+          const finProcesamiento = Date.now();
+          const tiempoProcesamiento = (finProcesamiento - window.inicioProcesamiento) / 1000;
+          const tiempoTotal = (parseFloat(window.tiemposSubida.total) + tiempoProcesamiento).toFixed(2);
+
+          let estadisticasHTML = `
+            Tiempo de subida: ${formatearTiempo(parseFloat(window.tiemposSubida.total))}<br>
+            Tiempo de procesamiento: ${formatearTiempo(tiempoProcesamiento)}<br>
+            Tiempo total: ${formatearTiempo(parseFloat(tiempoTotal))}
+          `;
+          
+          if (data.archivos_rechazados && data.archivos_rechazados.length > 0) {
+            estadisticasHTML += `<br><br><strong style="color: #ff4444;">ARCHIVOS NO PROCESABLES:</strong><br>`;
+            data.archivos_rechazados.forEach(rechazado => {
+              estadisticasHTML += `<span style="color: #ff4444;">• ${rechazado.archivo}: ${rechazado.razon}</span><br>`;
+            });
+          }
+          
+          tiemposContainer.innerHTML = estadisticasHTML;
+
+          downloadBtn.style.display = "block";
+          downloadBtn.dataset.filename = data.excel;
+          statusText.innerHTML = "<strong>Procesamiento completado</strong>";
+
+          window.inicioProcesamiento = null;
+        } else {
+          setTimeout(verificarResultado, 2000);
+        }
+      } catch (err) {
+        console.error("Error al verificar resultado:", err);
+        setTimeout(verificarResultado, 2000);
+      }
+    }
+
+    downloadBtn.addEventListener('click', () => {
+      const fname = downloadBtn.dataset.filename || 'procesadas.xlsx';
+      window.location.href = `/descargar_excel?file=${fname}`;
+    });
+
+    actualizarModoIndicador();
+    
+    renderFiles();
+  </script>
+</body>
+</html>
+</html>

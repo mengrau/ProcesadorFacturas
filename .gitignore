@@ -1,0 +1,19 @@
+# Ignorar archivos de caché
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Ignorar entornos virtuales
+.venv/
+venv/
+ENV/
+
+.vscode/
+
+# Ignorar archivos PDF
+*.pdf
+
+# Otros archivos y carpetas comunes a ignorar
+.DS_Store
+Thumbs.db
