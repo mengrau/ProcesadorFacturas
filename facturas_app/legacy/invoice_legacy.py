@@ -1,6 +1,7 @@
 import os
 import re
 import uuid
+import logging
 import pdfplumber
 import openpyxl
 import shutil
@@ -25,6 +26,8 @@ os.makedirs(FACTURAS_PROCESADAS, exist_ok=True)
 tiempos_procesamiento = []
 archivos_rechazados_global = []
 facturas_con_errores_global = []
+
+logger = logging.getLogger(__name__)
 
 
 def mover_archivo_seguro(origen: str, destino: str, max_intentos: int = 5) -> bool:
@@ -436,12 +439,28 @@ def extraer_datos_factura(
     modo: str = "acumular",
 ) -> list[dict]:
     datos = []
+    archivo_pdf = os.path.basename(pdf_path)
+    inicio_extraccion = time.perf_counter()
 
     with pdfplumber.open(pdf_path) as pdf:
         total_paginas = len(pdf.pages)
+        logger.info(
+            "Extraction start. file=%s mode=%s pages=%s block_size=%s",
+            archivo_pdf,
+            modo,
+            total_paginas,
+            paginas_por_bloque,
+        )
         for start in range(0, total_paginas, paginas_por_bloque):
             end = min(start + paginas_por_bloque, total_paginas)
             bloque = pdf.pages[start:end]
+            inicio_bloque = time.perf_counter()
+            logger.info(
+                "Extraction block start. file=%s block=%s-%s",
+                archivo_pdf,
+                start + 1,
+                end,
+            )
 
             numero_factura = None
             nit_cliente, nombre_cliente, cod_cliente = "", "", ""
@@ -459,6 +478,7 @@ def extraer_datos_factura(
                         facturas_vistas.add(numero_factura)
 
                     if procesar_factura:
+                        registros_antes = len(datos)
                         for (
                             ref,
                             prod,
@@ -491,9 +511,46 @@ def extraer_datos_factura(
                                 }
                             )
 
-            for page in bloque:
+                        logger.info(
+                            "Extraction invoice committed. file=%s numero_factura=%s productos=%s registros_agregados=%s",
+                            archivo_pdf,
+                            numero_factura,
+                            len(productos_totales),
+                            len(datos) - registros_antes,
+                        )
+                    else:
+                        logger.info(
+                            "Extraction invoice skipped. file=%s numero_factura=%s reason=duplicate_in_acumular",
+                            archivo_pdf,
+                            numero_factura,
+                        )
+
+            for page_idx_rel, page in enumerate(bloque):
+                pagina_actual = start + page_idx_rel + 1
+                inicio_pagina = time.perf_counter()
+                logger.info(
+                    "Extraction page start. file=%s page=%s",
+                    archivo_pdf,
+                    pagina_actual,
+                )
+
                 texto = page.extract_text() or ""
+                duracion_extract_texto = time.perf_counter() - inicio_pagina
+                logger.info(
+                    "Extraction field done. file=%s page=%s field=extract_text elapsed=%.3fs text_chars=%s",
+                    archivo_pdf,
+                    pagina_actual,
+                    duracion_extract_texto,
+                    len(texto),
+                )
+
                 if not texto.strip():
+                    logger.info(
+                        "Extraction page done. file=%s page=%s status=empty elapsed=%.3fs",
+                        archivo_pdf,
+                        pagina_actual,
+                        time.perf_counter() - inicio_pagina,
+                    )
                     continue
 
                 m = re.search(
@@ -503,22 +560,99 @@ def extraer_datos_factura(
                 )
                 if m:
                     nuevo_numero = m.group(1).strip()
+                    logger.info(
+                        "Extraction field done. file=%s page=%s field=numero_factura value=%s",
+                        archivo_pdf,
+                        pagina_actual,
+                        nuevo_numero,
+                    )
                     if numero_factura and nuevo_numero != numero_factura:
+                        logger.info(
+                            "Extraction invoice boundary detected. file=%s page=%s previous_numero=%s new_numero=%s",
+                            archivo_pdf,
+                            pagina_actual,
+                            numero_factura,
+                            nuevo_numero,
+                        )
                         guardar_factura()
                         productos_totales = []
                     numero_factura = nuevo_numero
+
+                    inicio_cliente = time.perf_counter()
                     nit_cliente, nombre_cliente, cod_cliente = _extraer_cliente(texto)
+                    logger.info(
+                        "Extraction field done. file=%s page=%s field=cliente elapsed=%.3fs nit=%s cod=%s nombre=%s",
+                        archivo_pdf,
+                        pagina_actual,
+                        time.perf_counter() - inicio_cliente,
+                        nit_cliente,
+                        cod_cliente,
+                        nombre_cliente,
+                    )
+
+                    inicio_fecha_gen = time.perf_counter()
                     fecha_generacion = _extraer_fecha_generacion(texto)
+                    logger.info(
+                        "Extraction field done. file=%s page=%s field=fecha_generacion elapsed=%.3fs value=%s",
+                        archivo_pdf,
+                        pagina_actual,
+                        time.perf_counter() - inicio_fecha_gen,
+                        fecha_generacion,
+                    )
+
+                    inicio_fecha_exp = time.perf_counter()
                     fecha_expedicion = _extraer_fecha_expedicion(texto)
+                    logger.info(
+                        "Extraction field done. file=%s page=%s field=fecha_expedicion elapsed=%.3fs value=%s",
+                        archivo_pdf,
+                        pagina_actual,
+                        time.perf_counter() - inicio_fecha_exp,
+                        fecha_expedicion,
+                    )
                     print(
                         f"    [DEBUG] Fecha expedición extraída: '{fecha_expedicion}'"
                     )
 
+                inicio_productos = time.perf_counter()
                 productos = _extraer_productos(texto)
+                logger.info(
+                    "Extraction field done. file=%s page=%s field=productos elapsed=%.3fs productos_pagina=%s",
+                    archivo_pdf,
+                    pagina_actual,
+                    time.perf_counter() - inicio_productos,
+                    len(productos),
+                )
                 if productos:
                     productos_totales.extend(productos)
+                    logger.info(
+                        "Extraction page products aggregated. file=%s page=%s productos_acumulados_factura=%s",
+                        archivo_pdf,
+                        pagina_actual,
+                        len(productos_totales),
+                    )
+
+                logger.info(
+                    "Extraction page done. file=%s page=%s elapsed=%.3fs",
+                    archivo_pdf,
+                    pagina_actual,
+                    time.perf_counter() - inicio_pagina,
+                )
 
             guardar_factura()
+            logger.info(
+                "Extraction block done. file=%s block=%s-%s elapsed=%.3fs",
+                archivo_pdf,
+                start + 1,
+                end,
+                time.perf_counter() - inicio_bloque,
+            )
+
+    logger.info(
+        "Extraction done. file=%s elapsed=%.3fs records=%s",
+        archivo_pdf,
+        time.perf_counter() - inicio_extraccion,
+        len(datos),
+    )
 
     return datos
 
@@ -712,6 +846,13 @@ def _recuperar_datos_excel(excel_path: str) -> list[dict]:
 def guardar_en_excel(datos: list[dict], modo: str = "acumular"):
     excel_path = EXCEL_SALIDA
     datos_existentes = []
+    inicio_guardado_excel = time.perf_counter()
+    logger.info(
+        "Excel write start. mode=%s path=%s incoming_records=%s",
+        modo,
+        excel_path,
+        len(datos),
+    )
 
     if modo == "acumular" and os.path.exists(excel_path):
         try:
@@ -917,7 +1058,26 @@ def guardar_en_excel(datos: list[dict], modo: str = "acumular"):
             ]
         )
 
+    logger.info(
+        "Excel write rows staged. mode=%s staged_rows=%s",
+        modo,
+        len(todos_datos),
+    )
+    inicio_save_excel = time.perf_counter()
+    logger.info("Excel write save start. path=%s", excel_path)
+
     wb.save(excel_path)
+    logger.info(
+        "Excel write save done. path=%s elapsed=%.3fs",
+        excel_path,
+        time.perf_counter() - inicio_save_excel,
+    )
+    logger.info(
+        "Excel write done. mode=%s total_elapsed=%.3fs total_rows=%s",
+        modo,
+        time.perf_counter() - inicio_guardado_excel,
+        len(todos_datos),
+    )
     print(
         f"    [OK] Excel guardado con {len(todos_datos)} registros totales ({len(datos_existentes)} existentes + {len(datos)} nuevos)"
     )

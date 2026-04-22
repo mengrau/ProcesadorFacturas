@@ -1,5 +1,7 @@
 # Ignorar carpeta de logs
 logs/
+logs/app.log
+*.log
 # Ignorar archivos de caché
 .pytest_cache/
 __pycache__/
