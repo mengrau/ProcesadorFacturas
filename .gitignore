@@ -1,4 +1,7 @@
+# Ignorar carpeta de logs
+logs/
 # Ignorar archivos de caché
+.pytest_cache/
 __pycache__/
 *.pyc
 *.pyo
@@ -10,6 +13,7 @@ venv/
 ENV/
 
 .vscode/
+logs/
 
 # Ignorar archivos PDF
 *.pdf
@@ -19,3 +23,33 @@ ENV/
 # Otros archivos y carpetas comunes a ignorar
 .DS_Store
 Thumbs.db
+
+# Ignorar cachés y archivos temporales en subcarpetas
+cod_facturas/__pycache__/
+facturas_app/__pycache__/
+facturas_app/api/__pycache__/
+facturas_app/legacy/__pycache__/
+facturas_app/models/__pycache__/
+facturas_app/services/__pycache__/
+facturas_app/utils/__pycache__/
+scripts/__pycache__/
+tests/__pycache__/
+
+# Ignorar archivos temporales de Python
+*~
+*.swp
+*.bak
+*.tmp
+
+# Ignorar archivos de entorno
+.env
+.env.*
+.env.local
+.env.example
+
+# Ignorar archivos de salida y temporales
+salida/
+procesadas.xlsx
+entrada/
+errores/
+rechazados/

@@ -61,9 +61,9 @@ def _get_processing_state() -> dict[str, Any]:
         return dict(_processing_state)
 
 
-def _run_background_processing(mode: str, run_id: str) -> None:
+def _run_background_processing(mode: str, run_id: str, settings: Settings) -> None:
     """Execute invoice processing in a background thread."""
-    service = _get_service()
+    service = InvoiceService(settings=settings)
     try:
         result = service.process_invoices(mode)
         _set_processing_state(
@@ -201,7 +201,7 @@ def upload_files():
 
     worker = threading.Thread(
         target=_run_background_processing,
-        args=(mode, run_id),
+        args=(mode, run_id, settings),
         daemon=True,
     )
     worker.start()
