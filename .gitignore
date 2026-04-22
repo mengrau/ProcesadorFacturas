@@ -13,7 +13,7 @@ ENV/
 
 # Ignorar archivos PDF
 *.pdf
-*.excel
+*.xlsx
 
 # Otros archivos y carpetas comunes a ignorar
 .DS_Store
