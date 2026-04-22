@@ -1,0 +1,12 @@
+2026-04-22 10:24:42,027 | INFO | facturas_app.logging_config | Logging configured. Log file: C:\Users\pracrmofc\OneDrive - Gaseosas Postobon S.A\Escritorio\Automatizaciones_postobon\Facturas\logs\app.log
+2026-04-22 10:24:42,202 | INFO | werkzeug | [31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+ * Running on all addresses (0.0.0.0)
+ * Running on http://127.0.0.1:5000
+ * Running on http://10.2.31.231:5000
+2026-04-22 10:24:42,203 | INFO | werkzeug | [33mPress CTRL+C to quit[0m
+2026-04-22 10:24:50,022 | INFO | werkzeug | 127.0.0.1 - - [22/Apr/2026 10:24:50] "[36mGET /facturas HTTP/1.1[0m" 304 -
+2026-04-22 10:24:50,105 | INFO | werkzeug | 127.0.0.1 - - [22/Apr/2026 10:24:50] "[36mGET /facturas/styles.css HTTP/1.1[0m" 304 -
+2026-04-22 10:24:55,147 | INFO | werkzeug | 127.0.0.1 - - [22/Apr/2026 10:24:55] "[36mGET / HTTP/1.1[0m" 304 -
+2026-04-22 10:24:55,181 | INFO | werkzeug | 127.0.0.1 - - [22/Apr/2026 10:24:55] "[36mGET /styles.css HTTP/1.1[0m" 304 -
+2026-04-22 10:25:04,793 | INFO | werkzeug | 127.0.0.1 - - [22/Apr/2026 10:25:04] "[36mGET /facturas HTTP/1.1[0m" 304 -
+2026-04-22 10:25:04,827 | INFO | werkzeug | 127.0.0.1 - - [22/Apr/2026 10:25:04] "[36mGET /facturas/styles.css HTTP/1.1[0m" 304 -
