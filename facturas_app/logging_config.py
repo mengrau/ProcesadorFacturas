@@ -1,12 +1,21 @@
 from __future__ import annotations
 
 import logging
+import multiprocessing
 from logging.config import dictConfig
 from pathlib import Path
 
 
+_LOGGING_CONFIGURED = False
+
+
 def configure_logging(log_level: str = "INFO", base_dir: Path | None = None) -> None:
     """Configure structured logging for console and rotating file output."""
+    global _LOGGING_CONFIGURED
+    if multiprocessing.current_process().name != "MainProcess":
+        return
+    if _LOGGING_CONFIGURED:
+        return
     root_dir = base_dir or Path(__file__).resolve().parents[1]
     log_dir = root_dir / "logs"
     log_dir.mkdir(parents=True, exist_ok=True)
@@ -44,4 +53,5 @@ def configure_logging(log_level: str = "INFO", base_dir: Path | None = None) -> 
         }
     )
 
+    _LOGGING_CONFIGURED = True
     logging.getLogger(__name__).info("Logging configured. Log file: %s", app_log_path)

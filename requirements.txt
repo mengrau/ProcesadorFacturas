@@ -3,6 +3,7 @@ flask-cors>=4.0,<5.0
 openpyxl>=3.1,<4.0
 pandas>=2.0,<3.0
 pdfplumber>=0.11,<1.0
+PyMuPDF>=1.24,<2.0
 pywin32>=306; platform_system == "Windows"
 pywinauto>=0.6.8; platform_system == "Windows"
 python-dotenv>=1.0,<2.0

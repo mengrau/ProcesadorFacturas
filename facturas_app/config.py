@@ -63,6 +63,12 @@ class Settings:
     processing_parallel_enabled: bool = True
     processing_max_workers: int = 0
     processing_quiet_legacy_logs: bool = True
+    page_timeout_seconds: float = 8.0
+    page_max_workers: int = 6
+    page_temp_dir: Path = Path("temp")
+    page_fallback_enabled: bool = True
+    page_fallback_library: str = "pymupdf"
+    page_keep_temp_files: bool = False
 
     @property
     def max_content_length_bytes(self) -> int:
@@ -155,6 +161,18 @@ class Settings:
                 os.getenv("PROCESSING_QUIET_LEGACY_LOGS"),
                 default=True,
             ),
+            page_timeout_seconds=float(os.getenv("PAGE_TIMEOUT_SECONDS", "10")),
+            page_max_workers=int(os.getenv("PAGE_MAX_WORKERS", "2")),
+            page_temp_dir=Path(os.getenv("PAGE_TEMP_DIR", str(facturas_root / "temp"))),
+            page_fallback_enabled=_as_bool(
+                os.getenv("PAGE_FALLBACK_ENABLED"),
+                default=True,
+            ),
+            page_fallback_library=os.getenv("PAGE_FALLBACK_LIBRARY", "pymupdf"),
+            page_keep_temp_files=_as_bool(
+                os.getenv("PAGE_KEEP_TEMP_FILES"),
+                default=False,
+            ),
         )
 
 
@@ -167,6 +185,7 @@ def ensure_directories(settings: Settings) -> None:
         settings.facturas_rechazados,
         settings.facturas_errores,
         settings.dsd_temp_path,
+        settings.page_temp_dir,
     )
     for directory in required_dirs:
         directory.mkdir(parents=True, exist_ok=True)
