@@ -64,7 +64,7 @@ class Settings:
     processing_max_workers: int = 0
     processing_quiet_legacy_logs: bool = True
     page_timeout_seconds: float = 8.0
-    page_max_workers: int = 6
+    page_max_workers: int = 4
     page_temp_dir: Path = Path("temp")
     page_fallback_enabled: bool = True
     page_fallback_library: str = "pymupdf"
@@ -161,8 +161,8 @@ class Settings:
                 os.getenv("PROCESSING_QUIET_LEGACY_LOGS"),
                 default=True,
             ),
-            page_timeout_seconds=float(os.getenv("PAGE_TIMEOUT_SECONDS", "10")),
-            page_max_workers=int(os.getenv("PAGE_MAX_WORKERS", "2")),
+            page_timeout_seconds=float(os.getenv("PAGE_TIMEOUT_SECONDS", "20")),
+            page_max_workers=int(os.getenv("PAGE_MAX_WORKERS", "5")),
             page_temp_dir=Path(os.getenv("PAGE_TEMP_DIR", str(facturas_root / "temp"))),
             page_fallback_enabled=_as_bool(
                 os.getenv("PAGE_FALLBACK_ENABLED"),
