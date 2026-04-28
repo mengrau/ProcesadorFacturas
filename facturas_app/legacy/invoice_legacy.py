@@ -14,14 +14,16 @@ from typing import Optional
 import flask
 from flask_cors import CORS
 import random
+from facturas_app.config import get_settings
 
 PROC_DEBUG = False
 
-BASE_PATH = r"C:\Users\pracrmofc\OneDrive - Gaseosas Postobon S.A\Escritorio\Automatizaciones_postobon"
-FACTURAS_ROOT = os.path.join(BASE_PATH, "Facturas")
-FACTURAS_PATH = os.path.join(FACTURAS_ROOT, "entrada")
-FACTURAS_PROCESADAS = os.path.join(FACTURAS_ROOT, "salida")
-EXCEL_SALIDA = os.path.join(FACTURAS_ROOT, "procesadas.xlsx")
+_settings = get_settings()
+BASE_PATH = str(_settings.base_path)
+FACTURAS_ROOT = str(_settings.facturas_root)
+FACTURAS_PATH = str(_settings.facturas_path)
+FACTURAS_PROCESADAS = str(_settings.facturas_procesadas)
+EXCEL_SALIDA = str(_settings.excel_salida)
 
 os.makedirs(FACTURAS_PATH, exist_ok=True)
 os.makedirs(FACTURAS_PROCESADAS, exist_ok=True)
@@ -39,12 +41,20 @@ def _env_bool(value, default: bool) -> bool:
     return str(value).strip().lower() in {"1", "true", "yes", "on"}
 
 
-PAGE_TIMEOUT_SECONDS = float(os.getenv("PAGE_TIMEOUT_SECONDS", "10"))
-PAGE_MAX_WORKERS = int(os.getenv("PAGE_MAX_WORKERS", "4"))
-PAGE_TEMP_DIR = os.getenv("PAGE_TEMP_DIR", os.path.join(FACTURAS_ROOT, "temp"))
-PAGE_FALLBACK_ENABLED = _env_bool(os.getenv("PAGE_FALLBACK_ENABLED"), True)
-PAGE_FALLBACK_LIBRARY = os.getenv("PAGE_FALLBACK_LIBRARY", "pymupdf").strip().lower()
-PAGE_KEEP_TEMP_FILES = _env_bool(os.getenv("PAGE_KEEP_TEMP_FILES"), False)
+PAGE_TIMEOUT_SECONDS = float(
+    os.getenv("PAGE_TIMEOUT_SECONDS", str(_settings.page_timeout_seconds))
+)
+PAGE_MAX_WORKERS = int(os.getenv("PAGE_MAX_WORKERS", str(_settings.page_max_workers)))
+PAGE_TEMP_DIR = os.getenv("PAGE_TEMP_DIR", str(_settings.page_temp_dir))
+PAGE_FALLBACK_ENABLED = _env_bool(
+    os.getenv("PAGE_FALLBACK_ENABLED"), _settings.page_fallback_enabled
+)
+PAGE_FALLBACK_LIBRARY = (
+    os.getenv("PAGE_FALLBACK_LIBRARY", _settings.page_fallback_library).strip().lower()
+)
+PAGE_KEEP_TEMP_FILES = _env_bool(
+    os.getenv("PAGE_KEEP_TEMP_FILES"), _settings.page_keep_temp_files
+)
 
 
 def mover_archivo_seguro(origen: str, destino: str, max_intentos: int = 5) -> bool:
@@ -290,25 +300,6 @@ def _extract_page_text_pdfplumber(pdf_path: str, page_index: int) -> str:
         return pdf.pages[page_index].extract_text() or ""
 
 
-def _extract_page_text_pymupdf(pdf_path: str, page_index: int) -> str:
-    try:
-        import pymupdf as fitz
-    except Exception as exc:
-        raise RuntimeError("PyMuPDF not available") from exc
-
-    if not hasattr(fitz, "open"):
-        raise RuntimeError("PyMuPDF module missing fitz.open()")
-
-    doc = fitz.open(pdf_path)
-    try:
-        if page_index < 0 or page_index >= doc.page_count:
-            raise IndexError("page_index out of range")
-        page = doc.load_page(page_index)
-        return page.get_text("text") or ""
-    finally:
-        doc.close()
-
-
 def _page_text_worker(
     engine: str, pdf_path: str, page_index: int, result_queue
 ) -> None:
@@ -316,8 +307,6 @@ def _page_text_worker(
     try:
         if engine == "pdfplumber":
             text = _extract_page_text_pdfplumber(pdf_path, page_index)
-        elif engine == "pymupdf":
-            text = _extract_page_text_pymupdf(pdf_path, page_index)
         else:
             raise ValueError(f"Unsupported engine: {engine}")
         result_queue.put(
@@ -391,90 +380,78 @@ def _extract_pages_with_timeout(
             result.get("error", ""),
         )
 
-    while pending or active:
-        while pending and len(active) < max_workers:
-            active.append(_start_task(pending.pop(0)))
+    try:
+        while pending or active:
+            while pending and len(active) < max_workers:
+                active.append(_start_task(pending.pop(0)))
 
+            for task in list(active):
+                result = None
+                try:
+                    result = task["queue"].get_nowait()
+                except queue.Empty:
+                    result = None
+                except Exception:
+                    result = None
+
+                if result is not None:
+                    result["page_index"] = task["page_index"]
+                    results[task["page_index"]] = result
+                    _log_result(result)
+                    task["process"].join(timeout=0)
+                    task["queue"].close()
+                    active.remove(task)
+                    continue
+
+                if not task["process"].is_alive():
+                    result = {
+                        "page_index": task["page_index"],
+                        "status": "ERROR",
+                        "text": "",
+                        "error": "worker_exited_without_result",
+                        "elapsed": time.perf_counter() - task["start"],
+                        "method": engine,
+                    }
+                    results[task["page_index"]] = result
+                    _log_result(result)
+                    task["queue"].close()
+                    active.remove(task)
+                    continue
+
+                elapsed = time.perf_counter() - task["start"]
+                if elapsed >= timeout_seconds:
+                    task["process"].terminate()
+                    task["process"].join(timeout=1)
+                    result = {
+                        "page_index": task["page_index"],
+                        "status": "TIMEOUT",
+                        "text": "",
+                        "error": f"timeout after {timeout_seconds:.2f}s",
+                        "elapsed": elapsed,
+                        "method": engine,
+                    }
+                    results[task["page_index"]] = result
+                    _log_result(result)
+                    task["queue"].close()
+                    active.remove(task)
+
+            if active:
+                time.sleep(0.05)
+    except KeyboardInterrupt:
         for task in list(active):
-            result = None
             try:
-                result = task["queue"].get_nowait()
-            except queue.Empty:
-                result = None
-            except Exception:
-                result = None
-
-            if result is not None:
-                result["page_index"] = task["page_index"]
-                results[task["page_index"]] = result
-                _log_result(result)
-                task["process"].join(timeout=0)
-                task["queue"].close()
-                active.remove(task)
-                continue
-
-            if not task["process"].is_alive():
-                result = {
-                    "page_index": task["page_index"],
-                    "status": "ERROR",
-                    "text": "",
-                    "error": "worker_exited_without_result",
-                    "elapsed": time.perf_counter() - task["start"],
-                    "method": engine,
-                }
-                results[task["page_index"]] = result
-                _log_result(result)
-                task["queue"].close()
-                active.remove(task)
-                continue
-
-            elapsed = time.perf_counter() - task["start"]
-            if elapsed >= timeout_seconds:
-                task["process"].terminate()
+                if task["process"].is_alive():
+                    task["process"].terminate()
                 task["process"].join(timeout=1)
-                result = {
-                    "page_index": task["page_index"],
-                    "status": "TIMEOUT",
-                    "text": "",
-                    "error": f"timeout after {timeout_seconds:.2f}s",
-                    "elapsed": elapsed,
-                    "method": engine,
-                }
-                results[task["page_index"]] = result
-                _log_result(result)
+            except Exception:
+                pass
+            try:
                 task["queue"].close()
-                active.remove(task)
-
-        if active:
-            time.sleep(0.05)
+            except Exception:
+                pass
+        raise
 
     return results
-
-
-def _build_temp_pdf(pdf_path: str, page_indices: list[int], output_path: str) -> bool:
-    if not page_indices:
-        return False
-    os.makedirs(os.path.dirname(output_path), exist_ok=True)
-    try:
-        import pymupdf as fitz
-    except Exception as exc:
-        logger.error("Fallback PDF builder missing PyMuPDF: %s", exc)
-        return False
-
-    if not hasattr(fitz, "open"):
-        logger.error("Fallback PDF builder missing fitz.open() in PyMuPDF")
-        return False
-
-    src = fitz.open(pdf_path)
-    dst = fitz.open()
-    try:
-        for page_index in page_indices:
-            dst.insert_pdf(src, from_page=page_index, to_page=page_index)
-        dst.save(output_path)
-    finally:
-        dst.close()
-        src.close()
-    return True
 
 
 def _safe_unlink(path: str) -> None:
@@ -483,6 +460,23 @@ def _safe_unlink(path: str) -> None:
             os.remove(path)
     except Exception:
         return
+
+
+def _write_timeout_pages_file(
+    output_path: str,
+    page_indices: list[int],
+    total_pages: int,
+    source_file: str,
+) -> None:
+    os.makedirs(os.path.dirname(output_path), exist_ok=True)
+    lines = [
+        f"file={source_file}",
+        f"total_pages={total_pages}",
+        "timeout_pages_1_based=" + ",".join(str(i + 1) for i in page_indices),
+        "",
+    ]
+    with open(output_path, "w", encoding="utf-8") as handle:
+        handle.write("\n".join(lines))
 
 
 def _es_factura_valida(pdf_path: str) -> tuple[bool, str]:
@@ -716,93 +710,71 @@ def extraer_datos_factura(
         final_elapsed[page_index] = float(result.get("elapsed", 0.0))
         final_error[page_index] = result.get("error", "")
 
-    failed_pages = [
+    timeout_pages = [
         page_index
         for page_index in page_indices
-        if final_status.get(page_index) != "OK"
+        if final_status.get(page_index) == "TIMEOUT"
     ]
 
     temp_dir = os.path.join(PAGE_TEMP_DIR, os.path.splitext(archivo_pdf)[0])
-    created_files: list[str] = []
-    problematic_pdf_path = ""
+    if timeout_pages:
+        timeout_list_path = os.path.join(temp_dir, "paginas_timeout.txt")
+        _write_timeout_pages_file(
+            timeout_list_path,
+            timeout_pages,
+            total_paginas,
+            archivo_pdf,
+        )
+        logger.info(
+            "Page timeout list saved. file=%s pages=%s path=%s",
+            archivo_pdf,
+            len(timeout_pages),
+            timeout_list_path,
+        )
 
-    if failed_pages:
-        problematic_pdf_path = os.path.join(temp_dir, "paginas_problematicas.pdf")
-        if PAGE_FALLBACK_ENABLED and PAGE_FALLBACK_LIBRARY == "pymupdf":
-            try:
-                if _build_temp_pdf(pdf_path, failed_pages, problematic_pdf_path):
-                    created_files.append(problematic_pdf_path)
-                    logger.info(
-                        "Page fallback start. file=%s pages=%s engine=pymupdf",
-                        archivo_pdf,
-                        len(failed_pages),
-                    )
-                    fallback_results = _extract_pages_with_timeout(
-                        "pymupdf",
-                        problematic_pdf_path,
-                        list(range(len(failed_pages))),
-                        timeout_seconds,
-                        max_workers,
-                        source_file=archivo_pdf,
-                        page_map={
-                            offset: page_index
-                            for offset, page_index in enumerate(failed_pages)
-                        },
-                    )
-                    for offset, page_index in enumerate(failed_pages):
-                        fallback = fallback_results.get(
-                            offset,
-                            {
-                                "status": "ERROR",
-                                "text": "",
-                                "error": "missing_result",
-                                "elapsed": 0.0,
-                                "method": "pymupdf",
-                            },
-                        )
-                        if fallback.get("status") == "OK":
-                            final_texts[page_index] = fallback.get("text", "")
-                            final_status[page_index] = "RECUPERADA"
-                            final_method[page_index] = "pymupdf"
-                            final_elapsed[page_index] = float(
-                                fallback.get("elapsed", 0.0)
-                            )
-                            final_error[page_index] = ""
-                        else:
-                            final_status[page_index] = fallback.get("status", "ERROR")
-                            final_method[page_index] = "pymupdf"
-                            final_elapsed[page_index] = float(
-                                fallback.get("elapsed", 0.0)
-                            )
-                            final_error[page_index] = fallback.get("error", "")
+        if PAGE_FALLBACK_ENABLED:
+            retry_timeout = max(timeout_seconds * 2, timeout_seconds + 5)
+            logger.info(
+                "Page timeout retry start. file=%s pages=%s timeout=%.2fs workers=1 engine=pdfplumber",
+                archivo_pdf,
+                len(timeout_pages),
+                retry_timeout,
+            )
+            retry_results = _extract_pages_with_timeout(
+                "pdfplumber",
+                pdf_path,
+                timeout_pages,
+                retry_timeout,
+                1,
+                source_file=archivo_pdf,
+            )
+            for page_index in timeout_pages:
+                retry = retry_results.get(
+                    page_index,
+                    {
+                        "status": "ERROR",
+                        "text": "",
+                        "error": "missing_result",
+                        "elapsed": 0.0,
+                        "method": "pdfplumber",
+                    },
+                )
+                if retry.get("status") == "OK":
+                    final_texts[page_index] = retry.get("text", "")
+                    final_status[page_index] = "RECUPERADA"
+                    final_method[page_index] = "pdfplumber-retry"
+                    final_elapsed[page_index] = float(retry.get("elapsed", 0.0))
+                    final_error[page_index] = ""
                 else:
-                    logger.error(
-                        "Page fallback PDF creation failed. file=%s",
-                        archivo_pdf,
-                    )
-            except Exception as exc:
-                logger.exception(
-                    "Page fallback failed. file=%s error=%s",
-                    archivo_pdf,
-                    exc,
-                )
+                    final_status[page_index] = retry.get("status", "TIMEOUT")
+                    final_method[page_index] = "pdfplumber-retry"
+                    final_elapsed[page_index] = float(retry.get("elapsed", 0.0))
+                    final_error[page_index] = retry.get("error", "")
         else:
-            if PAGE_FALLBACK_ENABLED:
-                logger.warning(
-                    "Page fallback skipped. file=%s library=%s",
-                    archivo_pdf,
-                    PAGE_FALLBACK_LIBRARY,
-                )
-
-    ok_pages = [
-        page_index
-        for page_index in page_indices
-        if final_status.get(page_index) in {"OK", "RECUPERADA"}
-    ]
-    if ok_pages:
-        ok_pdf_path = os.path.join(temp_dir, "procesadas_ok.pdf")
-        if _build_temp_pdf(pdf_path, ok_pages, ok_pdf_path):
-            created_files.append(ok_pdf_path)
+            logger.warning(
+                "Page timeout retry skipped. file=%s",
+                archivo_pdf,
+            )
 
     for page_index in page_indices:
         logger.info(
@@ -815,15 +787,6 @@ def extraer_datos_factura(
             final_error.get(page_index, ""),
         )
 
-    if created_files and not PAGE_KEEP_TEMP_FILES:
-        for path in created_files:
-            _safe_unlink(path)
-        try:
-            if os.path.isdir(temp_dir) and not os.listdir(temp_dir):
-                os.rmdir(temp_dir)
-        except Exception:
-            pass
-
     logger.info(
         "Extraction start. file=%s mode=%s pages=%s block_size=%s",
         archivo_pdf,
@@ -832,16 +795,6 @@ def extraer_datos_factura(
         paginas_por_bloque,
     )
     try:
-        for start in range(0, total_paginas, paginas_por_bloque):
-            end = min(start + paginas_por_bloque, total_paginas)
-            inicio_bloque = time.perf_counter()
-            logger.info(
-                "Extraction block start. file=%s block=%s-%s",
-                archivo_pdf,
-                start + 1,
-                end,
-            )
-
         numero_factura = None
         nit_cliente, nombre_cliente, cod_cliente = "", "", ""
         fecha_generacion, fecha_expedicion = "", ""
@@ -905,110 +858,121 @@ def extraer_datos_factura(
                         numero_factura,
                     )
 
-        for page_index in range(start, end):
-            pagina_actual = page_index + 1
-            inicio_pagina = time.perf_counter()
+        for start in range(0, total_paginas, paginas_por_bloque):
+            end = min(start + paginas_por_bloque, total_paginas)
+            inicio_bloque = time.perf_counter()
             logger.info(
-                "Extraction page start. file=%s page=%s",
+                "Extraction block start. file=%s block=%s-%s",
                 archivo_pdf,
-                pagina_actual,
+                start + 1,
+                end,
             )
 
-            texto = final_texts.get(page_index, "")
-
-            if not texto.strip():
+            for page_index in range(start, end):
+                pagina_actual = page_index + 1
+                inicio_pagina = time.perf_counter()
                 logger.info(
-                    "Extraction page done. file=%s page=%s status=empty elapsed=%.3fs",
+                    "Extraction page start. file=%s page=%s",
+                    archivo_pdf,
+                    pagina_actual,
+                )
+
+                texto = final_texts.get(page_index, "")
+
+                if not texto.strip():
+                    logger.info(
+                        "Extraction page done. file=%s page=%s status=empty elapsed=%.3fs",
+                        archivo_pdf,
+                        pagina_actual,
+                        time.perf_counter() - inicio_pagina,
+                    )
+                    continue
+
+                m = re.search(
+                    r"FACTURA\s+ELECTR[ÓO]NICA\s+DE\s+VENTA\s+No\.?\s*([A-Z0-9\-]+)",
+                    texto,
+                    flags=re.IGNORECASE,
+                )
+                if m:
+                    nuevo_numero = m.group(1).strip()
+                    logger.info(
+                        "Extraction field done. file=%s page=%s field=numero_factura value=%s",
+                        archivo_pdf,
+                        pagina_actual,
+                        nuevo_numero,
+                    )
+                    if numero_factura and nuevo_numero != numero_factura:
+                        logger.info(
+                            "Extraction invoice boundary detected. file=%s page=%s previous_numero=%s new_numero=%s",
+                            archivo_pdf,
+                            pagina_actual,
+                            numero_factura,
+                            nuevo_numero,
+                        )
+                        guardar_factura()
+                        productos_totales = []
+                    numero_factura = nuevo_numero
+
+                    inicio_cliente = time.perf_counter()
+                    nit_cliente, nombre_cliente, cod_cliente = _extraer_cliente(texto)
+                    logger.info(
+                        "Extraction field done. file=%s page=%s field=cliente elapsed=%.3fs nit=%s cod=%s nombre=%s",
+                        archivo_pdf,
+                        pagina_actual,
+                        time.perf_counter() - inicio_cliente,
+                        nit_cliente,
+                        cod_cliente,
+                        nombre_cliente,
+                    )
+
+                    inicio_fecha_gen = time.perf_counter()
+                    fecha_generacion = _extraer_fecha_generacion(texto)
+                    logger.info(
+                        "Extraction field done. file=%s page=%s field=fecha_generacion elapsed=%.3fs value=%s",
+                        archivo_pdf,
+                        pagina_actual,
+                        time.perf_counter() - inicio_fecha_gen,
+                        fecha_generacion,
+                    )
+
+                    inicio_fecha_exp = time.perf_counter()
+                    fecha_expedicion = _extraer_fecha_expedicion(texto)
+                    logger.info(
+                        "Extraction field done. file=%s page=%s field=fecha_expedicion elapsed=%.3fs value=%s",
+                        archivo_pdf,
+                        pagina_actual,
+                        time.perf_counter() - inicio_fecha_exp,
+                        fecha_expedicion,
+                    )
+                    print(
+                        f"    [DEBUG] Fecha expedición extraída: '{fecha_expedicion}'"
+                    )
+
+                inicio_productos = time.perf_counter()
+                productos = _extraer_productos(texto)
+                logger.info(
+                    "Extraction field done. file=%s page=%s field=productos elapsed=%.3fs productos_pagina=%s",
+                    archivo_pdf,
+                    pagina_actual,
+                    time.perf_counter() - inicio_productos,
+                    len(productos),
+                )
+                if productos:
+                    productos_totales.extend(productos)
+                    logger.info(
+                        "Extraction page products aggregated. file=%s page=%s productos_acumulados_factura=%s",
+                        archivo_pdf,
+                        pagina_actual,
+                        len(productos_totales),
+                    )
+
+                logger.info(
+                    "Extraction page done. file=%s page=%s elapsed=%.3fs",
                     archivo_pdf,
                     pagina_actual,
                     time.perf_counter() - inicio_pagina,
                 )
-                continue
 
-            m = re.search(
-                r"FACTURA\s+ELECTR[ÓO]NICA\s+DE\s+VENTA\s+No\.?\s*([A-Z0-9\-]+)",
-                texto,
-                flags=re.IGNORECASE,
-            )
-            if m:
-                nuevo_numero = m.group(1).strip()
-                logger.info(
-                    "Extraction field done. file=%s page=%s field=numero_factura value=%s",
-                    archivo_pdf,
-                    pagina_actual,
-                    nuevo_numero,
-                )
-                if numero_factura and nuevo_numero != numero_factura:
-                    logger.info(
-                        "Extraction invoice boundary detected. file=%s page=%s previous_numero=%s new_numero=%s",
-                        archivo_pdf,
-                        pagina_actual,
-                        numero_factura,
-                        nuevo_numero,
-                    )
-                    guardar_factura()
-                    productos_totales = []
-                numero_factura = nuevo_numero
-
-                inicio_cliente = time.perf_counter()
-                nit_cliente, nombre_cliente, cod_cliente = _extraer_cliente(texto)
-                logger.info(
-                    "Extraction field done. file=%s page=%s field=cliente elapsed=%.3fs nit=%s cod=%s nombre=%s",
-                    archivo_pdf,
-                    pagina_actual,
-                    time.perf_counter() - inicio_cliente,
-                    nit_cliente,
-                    cod_cliente,
-                    nombre_cliente,
-                )
-
-                inicio_fecha_gen = time.perf_counter()
-                fecha_generacion = _extraer_fecha_generacion(texto)
-                logger.info(
-                    "Extraction field done. file=%s page=%s field=fecha_generacion elapsed=%.3fs value=%s",
-                    archivo_pdf,
-                    pagina_actual,
-                    time.perf_counter() - inicio_fecha_gen,
-                    fecha_generacion,
-                )
-
-                inicio_fecha_exp = time.perf_counter()
-                fecha_expedicion = _extraer_fecha_expedicion(texto)
-                logger.info(
-                    "Extraction field done. file=%s page=%s field=fecha_expedicion elapsed=%.3fs value=%s",
-                    archivo_pdf,
-                    pagina_actual,
-                    time.perf_counter() - inicio_fecha_exp,
-                    fecha_expedicion,
-                )
-                print(f"    [DEBUG] Fecha expedición extraída: '{fecha_expedicion}'")
-
-            inicio_productos = time.perf_counter()
-            productos = _extraer_productos(texto)
-            logger.info(
-                "Extraction field done. file=%s page=%s field=productos elapsed=%.3fs productos_pagina=%s",
-                archivo_pdf,
-                pagina_actual,
-                time.perf_counter() - inicio_productos,
-                len(productos),
-            )
-            if productos:
-                productos_totales.extend(productos)
-                logger.info(
-                    "Extraction page products aggregated. file=%s page=%s productos_acumulados_factura=%s",
-                    archivo_pdf,
-                    pagina_actual,
-                    len(productos_totales),
-                )
-
-            logger.info(
-                "Extraction page done. file=%s page=%s elapsed=%.3fs",
-                archivo_pdf,
-                pagina_actual,
-                time.perf_counter() - inicio_pagina,
-            )
-
-            guardar_factura()
             logger.info(
                 "Extraction block done. file=%s block=%s-%s elapsed=%.3fs",
                 archivo_pdf,
@@ -1016,6 +980,8 @@ def extraer_datos_factura(
                 end,
                 time.perf_counter() - inicio_bloque,
             )
+
+        guardar_factura()
     except Exception as exc:
         logger.exception(
             "Extraction failed mid-stream. file=%s error=%s partial_records=%s",

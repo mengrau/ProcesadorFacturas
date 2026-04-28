@@ -12,6 +12,7 @@ import pandas as pd
 import uuid
 import subprocess
 from datetime import datetime
+from facturas_app.config import get_settings
 
 try:
     import win32com.client
@@ -36,24 +37,23 @@ except ImportError:
     )
     print("[INFO] Instala con: pip install pywinauto")
 
-BASE_PATH = r"C:\Users\pracrmofc\OneDrive - Gaseosas Postobon S.A\Escritorio\Automatizaciones_postobon"
+_settings = get_settings()
+BASE_PATH = str(_settings.base_path)
 
-CODIGOS_PRINCIPALES_PATH = os.path.join(BASE_PATH, "Web")
+CODIGOS_PRINCIPALES_PATH = str(_settings.web_assets_path)
 
-FACTURAS_ROOT = os.path.join(BASE_PATH, "Facturas")
-FACTURAS_PATH = os.path.join(FACTURAS_ROOT, "entrada")
-FACTURAS_CODIGO_PATH = os.path.join(FACTURAS_ROOT, "cod_facturas")
-FACTURAS_RECHAZADOS = os.path.join(FACTURAS_ROOT, "rechazados")
-FACTURAS_ERRORES = os.path.join(FACTURAS_ROOT, "errores")
+FACTURAS_ROOT = str(_settings.facturas_root)
+FACTURAS_PATH = str(_settings.facturas_path)
+FACTURAS_CODIGO_PATH = str(_settings.facturas_codigo_path)
+FACTURAS_RECHAZADOS = str(_settings.facturas_rechazados)
+FACTURAS_ERRORES = str(_settings.facturas_errores)
 
 os.makedirs(FACTURAS_PATH, exist_ok=True)
 os.makedirs(FACTURAS_RECHAZADOS, exist_ok=True)
 os.makedirs(FACTURAS_ERRORES, exist_ok=True)
 
-CARPETA_BASE_DIF = (
-    r"C:\Users\pracrmofc\OneDrive - Gaseosas Postobon S.A\LISTAS DE PRECIOS"
-)
-DESHABILITAR_ACTUALIZACION_EXCEL = True
+CARPETA_BASE_DIF = str(_settings.carpeta_base_dif)
+DESHABILITAR_ACTUALIZACION_EXCEL = bool(_settings.disable_excel_update)
 
 PORTAFOLIOS_DIF = [
     "PORTAFOLIO ARA",
@@ -2142,11 +2142,9 @@ def api_portafolios_progreso():
     return jsonify(progreso_portafolios)
 
 
-RUTA_BASE_JERARQUIA = r"C:\Users\pracrmofc\OneDrive - Gaseosas Postobon S.A\Analistas Precios - BASES SAP\MaestraCientes\Base Jerarquia.xlsx"
-RUTA_SALIDA_DSD = (
-    r"C:\Users\pracrmofc\OneDrive - Gaseosas Postobon S.A\Analistas Precios - BASES SAP"
-)
-DSD_TEMP_PATH = os.path.join(BASE_PATH, "DSD_temp")
+RUTA_BASE_JERARQUIA = str(_settings.ruta_base_jerarquia)
+RUTA_SALIDA_DSD = str(_settings.ruta_salida_dsd)
+DSD_TEMP_PATH = str(_settings.dsd_temp_path)
 os.makedirs(DSD_TEMP_PATH, exist_ok=True)
 
 archivo_dsd_subido = None

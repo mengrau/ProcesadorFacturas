@@ -1,16 +1,30 @@
+@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;600;700&display=swap');
+
 :root {
-  --fondo: #0f1724;
-  --tarjeta: #22222270;
-  --acento: #041a4b;
-  --desaprobado: #ffffff;
+  --bg: #0b0f1a;
+  --bg-2: #101e2b;
+  --card: rgba(16, 24, 36, 0.9);
+  --accent: #f3b33e;
+  --accent-2: #29d3a0;
+  --text: #f5f7fb;
+  --muted: #9cb0c6;
+  --stroke: rgba(255, 255, 255, 0.1);
+  --fondo: var(--bg);
+  --tarjeta: var(--card);
+  --acento: var(--accent);
+  --desaprobado: var(--muted);
+}
+
+* {
+  box-sizing: border-box;
 }
 
 html, body {
   height: 100%;
   margin: 0;
-  font-family: Inter, Segoe UI, Roboto, Arial, sans-serif;
-  background:#041a4b;
-  color: #e6eef6;
+  font-family: 'Space Grotesk', 'Segoe UI', sans-serif;
+  background: radial-gradient(circle at top, #1a2a3b 0%, var(--bg) 55%);
+  color: var(--text);
 }
 
 .wrap {
@@ -38,6 +52,7 @@ p.introduccion {
 
 .tarjeta {
   background: var(--tarjeta);
+  border: 1px solid var(--stroke);
   border-radius: 12px;
   padding: 18px;
   box-shadow: 0 6px 18px rgba(2, 6, 23, 0.6);
@@ -86,7 +101,7 @@ p.introduccion {
 
 .btn {
   background: var(--acento);
-  color: #fff;
+  color: #1b1406;
   display: inline-block;
   padding: 10px 14px;
   border-radius: 8px;

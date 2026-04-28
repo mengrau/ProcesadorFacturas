@@ -64,7 +64,7 @@ class Settings:
     processing_max_workers: int = 0
     processing_quiet_legacy_logs: bool = True
     page_timeout_seconds: float = 8.0
-    page_max_workers: int = 4
+    page_max_workers: int = 5
     page_temp_dir: Path = Path("temp")
     page_fallback_enabled: bool = True
     page_fallback_library: str = "pymupdf"
@@ -81,7 +81,7 @@ class Settings:
         _load_dotenv_if_available()
 
         workspace_root = Path(__file__).resolve().parents[1]
-        default_base_path = workspace_root.parent
+        default_base_path = workspace_root
 
         base_path = Path(os.getenv("BASE_PATH", str(default_base_path)))
         facturas_root = Path(os.getenv("FACTURAS_ROOT", str(base_path / "Facturas")))
@@ -102,12 +102,14 @@ class Settings:
                 os.getenv("FACTURAS_ERRORES", str(facturas_root / "errores"))
             ),
             facturas_codigo_path=Path(
-                os.getenv("FACTURAS_CODIGO_PATH", str(facturas_root / "cod_facturas"))
+                os.getenv("FACTURAS_CODIGO_PATH", str(workspace_root / "cod_facturas"))
             ),
             excel_salida=Path(
                 os.getenv("EXCEL_SALIDA", str(facturas_root / "procesadas.xlsx"))
             ),
-            web_assets_path=Path(os.getenv("WEB_ASSETS_PATH", str(base_path / "Web"))),
+            web_assets_path=Path(
+                os.getenv("WEB_ASSETS_PATH", str(workspace_root / "web"))
+            ),
             carpeta_base_dif=Path(
                 os.getenv(
                     "CARPETA_BASE_DIF",
@@ -162,7 +164,7 @@ class Settings:
                 default=True,
             ),
             page_timeout_seconds=float(os.getenv("PAGE_TIMEOUT_SECONDS", "20")),
-            page_max_workers=int(os.getenv("PAGE_MAX_WORKERS", "5")),
+            page_max_workers=int(os.getenv("PAGE_MAX_WORKERS", "8")),
             page_temp_dir=Path(os.getenv("PAGE_TEMP_DIR", str(facturas_root / "temp"))),
             page_fallback_enabled=_as_bool(
                 os.getenv("PAGE_FALLBACK_ENABLED"),
