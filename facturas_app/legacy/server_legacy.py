@@ -12,6 +12,7 @@ import pandas as pd
 import uuid
 import subprocess
 from datetime import datetime
+from facturas_app.config import get_settings
 
 try:
     import win32com.client
@@ -36,24 +37,23 @@ except ImportError:
     )
     print("[INFO] Instala con: pip install pywinauto")
 
-BASE_PATH = r"C:\Users\pracrmofc\OneDrive - Gaseosas Postobon S.A\Escritorio\Automatizaciones_postobon"
+_settings = get_settings()
+BASE_PATH = str(_settings.base_path)
 
-CODIGOS_PRINCIPALES_PATH = os.path.join(BASE_PATH, "Web")
+CODIGOS_PRINCIPALES_PATH = str(_settings.web_assets_path)
 
-FACTURAS_ROOT = os.path.join(BASE_PATH, "Facturas")
-FACTURAS_PATH = os.path.join(FACTURAS_ROOT, "entrada")
-FACTURAS_CODIGO_PATH = os.path.join(FACTURAS_ROOT, "cod_facturas")
-FACTURAS_RECHAZADOS = os.path.join(FACTURAS_ROOT, "rechazados")
-FACTURAS_ERRORES = os.path.join(FACTURAS_ROOT, "errores")
+FACTURAS_ROOT = str(_settings.facturas_root)
+FACTURAS_PATH = str(_settings.facturas_path)
+FACTURAS_CODIGO_PATH = str(_settings.facturas_codigo_path)
+FACTURAS_RECHAZADOS = str(_settings.facturas_rechazados)
+FACTURAS_ERRORES = str(_settings.facturas_errores)
 
 os.makedirs(FACTURAS_PATH, exist_ok=True)
 os.makedirs(FACTURAS_RECHAZADOS, exist_ok=True)
 os.makedirs(FACTURAS_ERRORES, exist_ok=True)
 
-CARPETA_BASE_DIF = (
-    r"C:\Users\pracrmofc\OneDrive - Gaseosas Postobon S.A\LISTAS DE PRECIOS"
-)
-DESHABILITAR_ACTUALIZACION_EXCEL = True
+CARPETA_BASE_DIF = str(_settings.carpeta_base_dif)
+DESHABILITAR_ACTUALIZACION_EXCEL = bool(_settings.disable_excel_update)
 
 PORTAFOLIOS_DIF = [
     "PORTAFOLIO ARA",
@@ -181,32 +181,6 @@ def index():
 def styles():
     return send_from_directory(
         CODIGOS_PRINCIPALES_PATH, "styles.css", mimetype="text/css"
-    )
-
-
-@app.route("/diferencias")
-@app.route("/diferencias/")
-def diferencias_page():
-    return send_from_directory(CODIGOS_PRINCIPALES_PATH, "diferencias.html")
-
-
-@app.route("/diferencias.css")
-def diferencias_css():
-    return send_from_directory(
-        CODIGOS_PRINCIPALES_PATH, "diferencias.css", mimetype="text/css", max_age=0
-    )
-
-
-@app.route("/listas")
-@app.route("/listas/")
-def listas_page():
-    return send_from_directory(CODIGOS_PRINCIPALES_PATH, "listas.html")
-
-
-@app.route("/listas.css")
-def listas_css():
-    return send_from_directory(
-        CODIGOS_PRINCIPALES_PATH, "listas.css", mimetype="text/css", max_age=0
     )
 
 
@@ -532,31 +506,6 @@ def _run_listas():
         progreso_listas["estado"] = "error"
         progreso_listas["etapa"] = "Error"
         progreso_listas["mensaje"] = str(e)
-
-
-@app.route("/api/listas/iniciar", methods=["POST"])
-def api_listas_iniciar():
-    if progreso_listas.get("estado") == "procesando":
-        return jsonify({"error": "Ya hay un proceso en ejecución"}), 400
-
-    t = threading.Thread(target=_run_listas, daemon=True)
-    t.start()
-    return jsonify({"ok": True})
-
-
-@app.route("/api/listas/estado", methods=["GET"])
-def api_listas_estado():
-    return jsonify(progreso_listas)
-
-
-@app.route("/api/listas/descargar", methods=["GET"])
-def api_listas_descargar():
-    archivo = progreso_listas.get("archivo_generado")
-    if not archivo or not os.path.exists(archivo):
-        return jsonify({"error": "Archivo no disponible"}), 404
-    return send_from_directory(
-        os.path.dirname(archivo), os.path.basename(archivo), as_attachment=True
-    )
 
 
 def _wait_sap_not_busy(session, timeout=120):
@@ -1768,21 +1717,6 @@ def _run_diferencias():
         progreso_diferencias["mensaje"] = str(e)
 
 
-@app.route("/api/diferencias/iniciar", methods=["POST"])
-def api_diferencias_iniciar():
-    if progreso_diferencias.get("estado") == "procesando":
-        return jsonify({"error": "Ya hay un proceso en ejecución"}), 400
-
-    thread = threading.Thread(target=_run_diferencias, daemon=True)
-    thread.start()
-    return jsonify({"ok": True})
-
-
-@app.route("/api/diferencias/estado", methods=["GET"])
-def api_diferencias_estado():
-    return jsonify(progreso_diferencias)
-
-
 def _actualizar_excel_portafolio(ruta_excel: str) -> tuple[bool, str]:
     """
     Abre un archivo Excel, ejecuta RefreshAll para actualizar todas las conexiones,
@@ -2101,19 +2035,6 @@ def _run_portafolios():
         progreso_portafolios["mensaje"] = str(e)
 
 
-@app.route("/portafolios")
-@app.route("/portafolios/")
-def portafolios_page():
-    return send_from_directory(CODIGOS_PRINCIPALES_PATH, "portafolios.html")
-
-
-@app.route("/portafolios.css")
-def portafolios_css():
-    return send_from_directory(
-        CODIGOS_PRINCIPALES_PATH, "portafolios.css", mimetype="text/css", max_age=0
-    )
-
-
 @app.route("/dsd")
 @app.route("/dsd/")
 def dsd_page():
@@ -2127,26 +2048,9 @@ def dsd_css():
     )
 
 
-@app.route("/api/portafolios/iniciar", methods=["POST"])
-def api_portafolios_iniciar():
-    if progreso_portafolios.get("estado") == "procesando":
-        return jsonify({"error": "Ya hay un proceso en ejecución"}), 400
-
-    thread = threading.Thread(target=_run_portafolios, daemon=True)
-    thread.start()
-    return jsonify({"ok": True})
-
-
-@app.route("/api/portafolios/progreso", methods=["GET"])
-def api_portafolios_progreso():
-    return jsonify(progreso_portafolios)
-
-
-RUTA_BASE_JERARQUIA = r"C:\Users\pracrmofc\OneDrive - Gaseosas Postobon S.A\Analistas Precios - BASES SAP\MaestraCientes\Base Jerarquia.xlsx"
-RUTA_SALIDA_DSD = (
-    r"C:\Users\pracrmofc\OneDrive - Gaseosas Postobon S.A\Analistas Precios - BASES SAP"
-)
-DSD_TEMP_PATH = os.path.join(BASE_PATH, "DSD_temp")
+RUTA_BASE_JERARQUIA = str(_settings.ruta_base_jerarquia)
+RUTA_SALIDA_DSD = str(_settings.ruta_salida_dsd)
+DSD_TEMP_PATH = str(_settings.dsd_temp_path)
 os.makedirs(DSD_TEMP_PATH, exist_ok=True)
 
 archivo_dsd_subido = None
@@ -2603,16 +2507,6 @@ def api_dsd_descargar():
     return send_from_directory(carpeta, nombre, as_attachment=True)
 
 
-@app.route("/api/diferencias/descargar", methods=["GET"])
-def api_diferencias_descargar():
-    archivo = progreso_diferencias.get("archivo_generado")
-    if not archivo or not os.path.exists(archivo):
-        return jsonify({"error": "Archivo no disponible"}), 404
-    carpeta = os.path.dirname(archivo)
-    nombre = os.path.basename(archivo)
-    return send_from_directory(carpeta, nombre, as_attachment=True)
-
-
 @app.route("/facturas")
 def facturas_index():
     """
@@ -2853,9 +2747,6 @@ if __name__ == "__main__":
     print("Aplicaciones disponibles:")
     print("  - Menú Principal:           http://localhost:5000/")
     print("  - FactuVal:                 http://localhost:5000/facturas")
-    print("  - Validador de Diferencias: http://localhost:5000/diferencias")
-    print("  - Validador de Listas:      http://localhost:5000/listas")
-    print("  - Actualizador de Portafolios: http://localhost:5000/portafolios")
     print("  - Consulta de pedidos DSD:  http://localhost:5000/dsd")
     print("=" * 60)
 

@@ -13858,3 +13858,106 @@
 2026-04-27 16:05:47,464 | INFO | werkzeug | 127.0.0.1 - - [27/Apr/2026 16:05:47] "GET /resultado HTTP/1.1" 200 -
 2026-04-27 16:05:50,150 | INFO | werkzeug | 127.0.0.1 - - [27/Apr/2026 16:05:50] "GET /resultado HTTP/1.1" 200 -
 2026-04-27 16:05:53,431 | INFO | werkzeug | 127.0.0.1 - - [27/Apr/2026 16:05:53] "GET /resultado HTTP/1.1" 200 -
+2026-04-27 19:55:37,460 | INFO | facturas_app.logging_config | Logging configured. Log file: C:\Users\User\Desktop\ProcesadorFacturas\ProcesadorFacturas\logs\app.log
+2026-04-27 19:55:37,477 | INFO | werkzeug | [31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+ * Running on all addresses (0.0.0.0)
+ * Running on http://127.0.0.1:5000
+ * Running on http://192.168.100.3:5000
+2026-04-27 19:55:37,477 | INFO | werkzeug | [33mPress CTRL+C to quit[0m
+2026-04-27 19:55:41,929 | INFO | werkzeug | 192.168.100.3 - - [27/Apr/2026 19:55:41] "[33mGET / HTTP/1.1[0m" 404 -
+2026-04-27 19:56:29,028 | INFO | werkzeug | 127.0.0.1 - - [27/Apr/2026 19:56:29] "GET /api/health HTTP/1.1" 200 -
+2026-04-27 19:56:37,473 | INFO | werkzeug | 127.0.0.1 - - [27/Apr/2026 19:56:37] "GET /api/dsd/estado HTTP/1.1" 200 -
+2026-04-27 19:57:22,313 | INFO | facturas_app.logging_config | Logging configured. Log file: C:\Users\User\Desktop\ProcesadorFacturas\ProcesadorFacturas\logs\app.log
+2026-04-27 19:57:22,329 | INFO | werkzeug | [31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+ * Running on all addresses (0.0.0.0)
+ * Running on http://127.0.0.1:5000
+ * Running on http://192.168.100.3:5000
+2026-04-27 19:57:22,329 | INFO | werkzeug | [33mPress CTRL+C to quit[0m
+2026-04-27 19:57:28,198 | INFO | werkzeug | 127.0.0.1 - - [27/Apr/2026 19:57:28] "GET / HTTP/1.1" 200 -
+2026-04-27 19:57:28,217 | INFO | werkzeug | 127.0.0.1 - - [27/Apr/2026 19:57:28] "GET /facturas/styles.css HTTP/1.1" 200 -
+2026-04-27 19:57:38,001 | INFO | werkzeug | 127.0.0.1 - - [27/Apr/2026 19:57:38] "[33mGET /dsd HTTP/1.1[0m" 404 -
+2026-04-27 19:57:47,789 | INFO | werkzeug | 127.0.0.1 - - [27/Apr/2026 19:57:47] "GET / HTTP/1.1" 200 -
+2026-04-27 19:57:47,805 | INFO | werkzeug | 127.0.0.1 - - [27/Apr/2026 19:57:47] "GET /facturas/styles.css HTTP/1.1" 200 -
+2026-04-27 19:58:02,174 | INFO | facturas_app.services.invoice_service | Starting invoice processing. mode=acumular
+2026-04-27 19:58:02,176 | INFO | werkzeug | 127.0.0.1 - - [27/Apr/2026 19:58:02] "POST /upload HTTP/1.1" 200 -
+2026-04-27 19:58:02,176 | INFO | facturas_app.services.invoice_service | Invoice pipeline selected. implementation=optimized
+2026-04-27 19:58:02,176 | INFO | facturas_app.services.invoice_service | Invoice stage start. stage=collect_pdf_files mode=acumular
+2026-04-27 19:58:02,177 | INFO | facturas_app.services.invoice_service | Invoice stage done. stage=collect_pdf_files mode=acumular elapsed=0.000s files=1
+2026-04-27 19:58:02,177 | INFO | facturas_app.services.invoice_service | Invoice stage start. stage=cargar_facturas_existentes mode=acumular excel=C:\Users\User\Desktop\ProcesadorFacturas\ProcesadorFacturas\Facturas\procesadas.xlsx
+2026-04-27 19:58:02,177 | INFO | facturas_app.services.invoice_service | Invoice stage done. stage=cargar_facturas_existentes mode=acumular elapsed=0.000s facturas_existentes=0
+2026-04-27 19:58:02,177 | INFO | facturas_app.services.invoice_service | Invoice optimized pipeline enabled. mode=acumular workers=1
+2026-04-27 19:58:02,178 | INFO | facturas_app.services.invoice_service | Invoice file processing started. file=ROYALFILMS12026-2401-2914.pdf mode=acumular
+2026-04-27 19:58:02,178 | INFO | facturas_app.services.invoice_service | Invoice stage start. stage=validate_invoice_pdf file=ROYALFILMS12026-2401-2914.pdf mode=acumular
+2026-04-27 19:58:02,179 | INFO | facturas_app.services.invoice_service | Invoice stage done. stage=validate_invoice_pdf file=ROYALFILMS12026-2401-2914.pdf mode=acumular elapsed=0.001s valid=True
+2026-04-27 19:58:02,179 | INFO | facturas_app.services.invoice_service | Invoice stage start. stage=extraer_datos_factura file=ROYALFILMS12026-2401-2914.pdf mode=acumular extraction_mode=separado
+2026-04-27 19:58:02,182 | INFO | werkzeug | 127.0.0.1 - - [27/Apr/2026 19:58:02] "GET /resultado HTTP/1.1" 200 -
+2026-04-27 19:58:02,518 | INFO | facturas_app.legacy.invoice_legacy | Page extraction start. file=ROYALFILMS12026-2401-2914.pdf pages=514 timeout=10.00s workers=2 engine=pdfplumber
+2026-04-27 19:58:04,297 | INFO | werkzeug | 127.0.0.1 - - [27/Apr/2026 19:58:04] "GET /resultado HTTP/1.1" 200 -
+2026-04-27 19:58:07,304 | INFO | werkzeug | 127.0.0.1 - - [27/Apr/2026 19:58:07] "GET /resultado HTTP/1.1" 200 -
+2026-04-27 19:58:10,298 | INFO | werkzeug | 127.0.0.1 - - [27/Apr/2026 19:58:10] "GET /resultado HTTP/1.1" 200 -
+2026-04-27 19:58:13,298 | INFO | werkzeug | 127.0.0.1 - - [27/Apr/2026 19:58:13] "GET /resultado HTTP/1.1" 200 -
+2026-04-27 20:01:10,838 | INFO | facturas_app.logging_config | Logging configured. Log file: C:\Users\User\Desktop\ProcesadorFacturas\ProcesadorFacturas\logs\app.log
+2026-04-27 20:01:10,855 | INFO | werkzeug | [31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+ * Running on all addresses (0.0.0.0)
+ * Running on http://127.0.0.1:5000
+ * Running on http://192.168.100.3:5000
+2026-04-27 20:01:10,855 | INFO | werkzeug | [33mPress CTRL+C to quit[0m
+2026-04-27 20:01:11,074 | INFO | werkzeug | 127.0.0.1 - - [27/Apr/2026 20:01:11] "GET /resultado HTTP/1.1" 200 -
+2026-04-27 20:01:13,230 | INFO | werkzeug | 127.0.0.1 - - [27/Apr/2026 20:01:13] "GET /resultado HTTP/1.1" 200 -
+2026-04-27 20:01:15,251 | INFO | werkzeug | 127.0.0.1 - - [27/Apr/2026 20:01:15] "GET /resultado HTTP/1.1" 200 -
+2026-04-27 20:01:15,271 | INFO | werkzeug | 127.0.0.1 - - [27/Apr/2026 20:01:15] "GET / HTTP/1.1" 200 -
+2026-04-27 20:01:15,288 | INFO | werkzeug | 127.0.0.1 - - [27/Apr/2026 20:01:15] "[36mGET /facturas/styles.css HTTP/1.1[0m" 304 -
+2026-04-27 20:01:17,234 | INFO | werkzeug | 127.0.0.1 - - [27/Apr/2026 20:01:17] "GET /dsd HTTP/1.1" 200 -
+2026-04-27 20:01:17,253 | INFO | werkzeug | 127.0.0.1 - - [27/Apr/2026 20:01:17] "GET /dsd.css HTTP/1.1" 200 -
+2026-04-27 20:01:22,091 | INFO | werkzeug | 127.0.0.1 - - [27/Apr/2026 20:01:22] "GET /facturas HTTP/1.1" 200 -
+2026-04-27 20:01:22,111 | INFO | werkzeug | 127.0.0.1 - - [27/Apr/2026 20:01:22] "[36mGET /facturas/styles.css HTTP/1.1[0m" 304 -
+2026-04-27 20:01:23,844 | INFO | werkzeug | 127.0.0.1 - - [27/Apr/2026 20:01:23] "GET /dsd HTTP/1.1" 200 -
+2026-04-27 20:01:23,862 | INFO | werkzeug | 127.0.0.1 - - [27/Apr/2026 20:01:23] "[36mGET /dsd.css HTTP/1.1[0m" 304 -
+2026-04-27 20:01:24,925 | INFO | werkzeug | 127.0.0.1 - - [27/Apr/2026 20:01:24] "GET /facturas HTTP/1.1" 200 -
+2026-04-27 20:01:24,946 | INFO | werkzeug | 127.0.0.1 - - [27/Apr/2026 20:01:24] "[36mGET /facturas/styles.css HTTP/1.1[0m" 304 -
+2026-04-27 20:02:30,171 | INFO | facturas_app.logging_config | Logging configured. Log file: C:\Users\User\Desktop\ProcesadorFacturas\ProcesadorFacturas\logs\app.log
+2026-04-27 20:02:30,186 | INFO | werkzeug | [31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+ * Running on all addresses (0.0.0.0)
+ * Running on http://127.0.0.1:5000
+ * Running on http://192.168.100.3:5000
+2026-04-27 20:02:30,186 | INFO | werkzeug | [33mPress CTRL+C to quit[0m
+2026-04-27 20:02:47,766 | INFO | facturas_app.services.invoice_service | Starting invoice processing. mode=acumular
+2026-04-27 20:02:47,767 | INFO | facturas_app.services.invoice_service | Invoice pipeline selected. implementation=optimized
+2026-04-27 20:02:47,768 | INFO | werkzeug | 127.0.0.1 - - [27/Apr/2026 20:02:47] "POST /upload HTTP/1.1" 200 -
+2026-04-27 20:02:47,768 | INFO | facturas_app.services.invoice_service | Invoice stage start. stage=collect_pdf_files mode=acumular
+2026-04-27 20:02:47,768 | INFO | facturas_app.services.invoice_service | Invoice stage done. stage=collect_pdf_files mode=acumular elapsed=0.000s files=1
+2026-04-27 20:02:47,768 | INFO | facturas_app.services.invoice_service | Invoice stage start. stage=cargar_facturas_existentes mode=acumular excel=C:\Users\User\Desktop\ProcesadorFacturas\ProcesadorFacturas\Facturas\procesadas.xlsx
+2026-04-27 20:02:47,768 | INFO | facturas_app.services.invoice_service | Invoice stage done. stage=cargar_facturas_existentes mode=acumular elapsed=0.000s facturas_existentes=0
+2026-04-27 20:02:47,768 | INFO | facturas_app.services.invoice_service | Invoice optimized pipeline enabled. mode=acumular workers=1
+2026-04-27 20:02:47,769 | INFO | facturas_app.services.invoice_service | Invoice file processing started. file=ROYALFILMS12026-2401-2914.pdf mode=acumular
+2026-04-27 20:02:47,769 | INFO | facturas_app.services.invoice_service | Invoice stage start. stage=validate_invoice_pdf file=ROYALFILMS12026-2401-2914.pdf mode=acumular
+2026-04-27 20:02:47,769 | INFO | facturas_app.services.invoice_service | Invoice stage done. stage=validate_invoice_pdf file=ROYALFILMS12026-2401-2914.pdf mode=acumular elapsed=0.000s valid=True
+2026-04-27 20:02:47,769 | INFO | facturas_app.services.invoice_service | Invoice stage start. stage=extraer_datos_factura file=ROYALFILMS12026-2401-2914.pdf mode=acumular extraction_mode=separado
+2026-04-27 20:02:47,773 | INFO | werkzeug | 127.0.0.1 - - [27/Apr/2026 20:02:47] "GET /resultado HTTP/1.1" 200 -
+2026-04-27 20:02:48,155 | INFO | facturas_app.legacy.invoice_legacy | Page extraction start. file=ROYALFILMS12026-2401-2914.pdf pages=514 timeout=10.00s workers=2 engine=pdfplumber
+2026-04-27 20:02:50,294 | INFO | werkzeug | 127.0.0.1 - - [27/Apr/2026 20:02:50] "GET /resultado HTTP/1.1" 200 -
+2026-04-27 20:03:33,771 | INFO | facturas_app.logging_config | Logging configured. Log file: C:\Users\User\Desktop\ProcesadorFacturas\ProcesadorFacturas\logs\app.log
+2026-04-27 20:03:33,787 | INFO | werkzeug | [31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+ * Running on all addresses (0.0.0.0)
+ * Running on http://127.0.0.1:5000
+ * Running on http://192.168.100.3:5000
+2026-04-27 20:03:33,787 | INFO | werkzeug | [33mPress CTRL+C to quit[0m
+2026-04-27 20:03:35,555 | INFO | werkzeug | 127.0.0.1 - - [27/Apr/2026 20:03:35] "GET /facturas HTTP/1.1" 200 -
+2026-04-27 20:03:35,576 | INFO | werkzeug | 127.0.0.1 - - [27/Apr/2026 20:03:35] "[36mGET /facturas/styles.css HTTP/1.1[0m" 304 -
+2026-04-27 20:03:47,063 | INFO | facturas_app.services.invoice_service | Starting invoice processing. mode=separado
+2026-04-27 20:03:47,065 | INFO | werkzeug | 127.0.0.1 - - [27/Apr/2026 20:03:47] "POST /upload HTTP/1.1" 200 -
+2026-04-27 20:03:47,065 | INFO | facturas_app.services.invoice_service | Invoice pipeline selected. implementation=optimized
+2026-04-27 20:03:47,065 | INFO | facturas_app.services.invoice_service | Invoice stage start. stage=collect_pdf_files mode=separado
+2026-04-27 20:03:47,065 | INFO | facturas_app.services.invoice_service | Invoice stage done. stage=collect_pdf_files mode=separado elapsed=0.000s files=1
+2026-04-27 20:03:47,065 | INFO | facturas_app.services.invoice_service | Invoice optimized pipeline enabled. mode=separado workers=1
+2026-04-27 20:03:47,066 | INFO | facturas_app.services.invoice_service | Invoice file processing started. file=ROYALFILMS12026-2401-2914.pdf mode=separado
+2026-04-27 20:03:47,066 | INFO | facturas_app.services.invoice_service | Invoice stage start. stage=validate_invoice_pdf file=ROYALFILMS12026-2401-2914.pdf mode=separado
+2026-04-27 20:03:47,066 | INFO | facturas_app.services.invoice_service | Invoice stage done. stage=validate_invoice_pdf file=ROYALFILMS12026-2401-2914.pdf mode=separado elapsed=0.001s valid=True
+2026-04-27 20:03:47,067 | INFO | facturas_app.services.invoice_service | Invoice stage start. stage=extraer_datos_factura file=ROYALFILMS12026-2401-2914.pdf mode=separado extraction_mode=separado
+2026-04-27 20:03:47,070 | INFO | werkzeug | 127.0.0.1 - - [27/Apr/2026 20:03:47] "GET /resultado HTTP/1.1" 200 -
+2026-04-27 20:03:47,397 | INFO | facturas_app.legacy.invoice_legacy | Page extraction start. file=ROYALFILMS12026-2401-2914.pdf pages=514 timeout=10.00s workers=2 engine=pdfplumber
+2026-04-27 20:03:49,299 | INFO | werkzeug | 127.0.0.1 - - [27/Apr/2026 20:03:49] "GET /resultado HTTP/1.1" 200 -
+2026-04-27 20:03:52,305 | INFO | werkzeug | 127.0.0.1 - - [27/Apr/2026 20:03:52] "GET /resultado HTTP/1.1" 200 -
+2026-04-27 20:03:55,297 | INFO | werkzeug | 127.0.0.1 - - [27/Apr/2026 20:03:55] "GET /resultado HTTP/1.1" 200 -
+2026-04-27 20:03:58,306 | INFO | werkzeug | 127.0.0.1 - - [27/Apr/2026 20:03:58] "GET /resultado HTTP/1.1" 200 -
+2026-04-27 20:04:01,299 | INFO | werkzeug | 127.0.0.1 - - [27/Apr/2026 20:04:01] "GET /resultado HTTP/1.1" 200 -

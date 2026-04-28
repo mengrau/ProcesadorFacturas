@@ -81,7 +81,7 @@ class Settings:
         _load_dotenv_if_available()
 
         workspace_root = Path(__file__).resolve().parents[1]
-        default_base_path = workspace_root.parent
+        default_base_path = workspace_root
 
         base_path = Path(os.getenv("BASE_PATH", str(default_base_path)))
         facturas_root = Path(os.getenv("FACTURAS_ROOT", str(base_path / "Facturas")))
@@ -102,12 +102,14 @@ class Settings:
                 os.getenv("FACTURAS_ERRORES", str(facturas_root / "errores"))
             ),
             facturas_codigo_path=Path(
-                os.getenv("FACTURAS_CODIGO_PATH", str(facturas_root / "cod_facturas"))
+                os.getenv("FACTURAS_CODIGO_PATH", str(workspace_root / "cod_facturas"))
             ),
             excel_salida=Path(
                 os.getenv("EXCEL_SALIDA", str(facturas_root / "procesadas.xlsx"))
             ),
-            web_assets_path=Path(os.getenv("WEB_ASSETS_PATH", str(base_path / "Web"))),
+            web_assets_path=Path(
+                os.getenv("WEB_ASSETS_PATH", str(workspace_root / "cod_facturas"))
+            ),
             carpeta_base_dif=Path(
                 os.getenv(
                     "CARPETA_BASE_DIF",

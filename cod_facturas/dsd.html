@@ -1,0 +1,219 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Consulta DSD</title>
+    <link rel="stylesheet" href="/dsd.css" />
+  </head>
+  <body>
+    <div class="glow"></div>
+    <main class="shell">
+      <nav class="app-selector">
+        <a class="btn-selector" href="/facturas">FactuVal</a>
+        <a class="btn-selector active" href="/dsd">Consulta DSD</a>
+      </nav>
+
+      <header class="hero">
+        <p class="kicker">Base Jerarquia</p>
+        <h1>Consulta de pedidos DSD</h1>
+        <p class="subtitle">
+          Sube la base, inicia el proceso y descarga el Excel de solicitantes.
+        </p>
+      </header>
+
+      <section class="card">
+        <div class="card-grid">
+          <div class="upload-panel">
+            <h2>1. Subir archivo</h2>
+            <p class="muted">Formato permitido: .xlsx, .xls, .xlsm</p>
+            <div class="file-drop">
+              <input id="fileInput" type="file" accept=".xlsx,.xls,.xlsm" />
+              <label for="fileInput">
+                <span>Seleccionar archivo</span>
+                <small id="fileName">Ningun archivo seleccionado</small>
+              </label>
+            </div>
+            <button id="uploadBtn" class="btn">Subir archivo</button>
+            <div id="uploadMsg" class="message"></div>
+          </div>
+
+          <div class="status-panel">
+            <h2>2. Procesar</h2>
+            <div class="status-box">
+              <div class="status-row">
+                <span>Estado</span>
+                <strong id="statusText">inactivo</strong>
+              </div>
+              <div class="status-row">
+                <span>Etapa</span>
+                <strong id="stageText">Esperando archivo</strong>
+              </div>
+              <div class="progress">
+                <div id="progressBar" class="bar" style="width: 0%">0%</div>
+              </div>
+            </div>
+            <div class="actions">
+              <button id="startBtn" class="btn btn-ghost">
+                Iniciar consulta
+              </button>
+              <a
+                id="downloadBtn"
+                class="btn btn-disabled"
+                href="/api/dsd/descargar"
+                >Descargar Excel</a
+              >
+            </div>
+            <div id="statusMsg" class="message"></div>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <script>
+      const fileInput = document.getElementById("fileInput");
+      const fileName = document.getElementById("fileName");
+      const uploadBtn = document.getElementById("uploadBtn");
+      const uploadMsg = document.getElementById("uploadMsg");
+      const startBtn = document.getElementById("startBtn");
+      const downloadBtn = document.getElementById("downloadBtn");
+      const statusText = document.getElementById("statusText");
+      const stageText = document.getElementById("stageText");
+      const progressBar = document.getElementById("progressBar");
+      const statusMsg = document.getElementById("statusMsg");
+
+      let pollId = null;
+
+      function setMessage(el, text, type) {
+        el.textContent = text || "";
+        el.className = "message" + (type ? " " + type : "");
+      }
+
+      function setProgress(value) {
+        const safe = Math.max(0, Math.min(100, value || 0));
+        progressBar.style.width = safe + "%";
+        progressBar.textContent = safe + "%";
+      }
+
+      function setDownloadEnabled(enabled) {
+        if (enabled) {
+          downloadBtn.classList.remove("btn-disabled");
+        } else {
+          downloadBtn.classList.add("btn-disabled");
+        }
+      }
+
+      function stopPolling() {
+        if (pollId) {
+          clearInterval(pollId);
+          pollId = null;
+        }
+      }
+
+      async function fetchStatus() {
+        try {
+          const res = await fetch("/api/dsd/estado", { cache: "no-store" });
+          const data = await res.json();
+
+          statusText.textContent = data.estado || "desconocido";
+          stageText.textContent = data.etapa || "...";
+          setProgress(data.progreso || 0);
+
+          if (data.estado === "completado") {
+            setMessage(
+              statusMsg,
+              "Proceso completado. Puedes descargar el archivo.",
+              "success",
+            );
+            setDownloadEnabled(true);
+            stopPolling();
+          }
+
+          if (data.estado === "error") {
+            setMessage(
+              statusMsg,
+              data.mensaje || "Error en el proceso",
+              "error",
+            );
+            setDownloadEnabled(false);
+            stopPolling();
+          }
+        } catch (err) {
+          setMessage(statusMsg, "No se pudo consultar el estado.", "error");
+        }
+      }
+
+      fileInput.addEventListener("change", () => {
+        const file = fileInput.files[0];
+        fileName.textContent = file ? file.name : "Ningun archivo seleccionado";
+        setMessage(uploadMsg, "", "");
+      });
+
+      uploadBtn.addEventListener("click", async () => {
+        const file = fileInput.files[0];
+        if (!file) {
+          setMessage(uploadMsg, "Selecciona un archivo primero.", "error");
+          return;
+        }
+
+        const formData = new FormData();
+        formData.append("file", file);
+
+        setMessage(uploadMsg, "Subiendo archivo...", "");
+
+        try {
+          const res = await fetch("/api/dsd/upload", {
+            method: "POST",
+            body: formData,
+          });
+          const data = await res.json();
+
+          if (!res.ok || data.error) {
+            setMessage(
+              uploadMsg,
+              data.error || "No se pudo subir el archivo.",
+              "error",
+            );
+            return;
+          }
+
+          setMessage(uploadMsg, "Archivo cargado correctamente.", "success");
+          stageText.textContent = "Archivo cargado. Listo para iniciar.";
+          statusText.textContent = "listo";
+          setProgress(0);
+          setDownloadEnabled(false);
+        } catch (err) {
+          setMessage(uploadMsg, "No se pudo subir el archivo.", "error");
+        }
+      });
+
+      startBtn.addEventListener("click", async () => {
+        setMessage(statusMsg, "Iniciando proceso...", "");
+        setDownloadEnabled(false);
+
+        try {
+          const res = await fetch("/api/dsd/iniciar", { method: "POST" });
+          const data = await res.json();
+
+          if (!res.ok || data.error) {
+            setMessage(
+              statusMsg,
+              data.error || "No se pudo iniciar el proceso.",
+              "error",
+            );
+            return;
+          }
+
+          setMessage(statusMsg, "Proceso en ejecucion...", "");
+          stopPolling();
+          await fetchStatus();
+          pollId = setInterval(fetchStatus, 2000);
+        } catch (err) {
+          setMessage(statusMsg, "No se pudo iniciar el proceso.", "error");
+        }
+      });
+
+      setDownloadEnabled(false);
+    </script>
+  </body>
+</html>

@@ -1,0 +1,248 @@
+@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;600;700&display=swap');
+
+:root {
+  --bg: #0b141a;
+  --panel: #101e2a;
+  --panel-2: #132536;
+  --accent: #f5b301;
+  --accent-2: #3ccf91;
+  --text: #eef2f6;
+  --muted: #a2b3c3;
+  --danger: #ff6b6b;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html, body {
+  margin: 0;
+  padding: 0;
+  min-height: 100%;
+  font-family: 'Space Grotesk', 'Segoe UI', sans-serif;
+  color: var(--text);
+  background: radial-gradient(circle at 20% 20%, #1c2c3a 0%, #0b141a 55%);
+}
+
+.glow {
+  position: fixed;
+  inset: -40% auto auto -20%;
+  width: 60vw;
+  height: 60vw;
+  background: radial-gradient(circle, rgba(60, 207, 145, 0.25), transparent 60%);
+  filter: blur(10px);
+  pointer-events: none;
+  z-index: 0;
+}
+
+.shell {
+  position: relative;
+  z-index: 1;
+  max-width: 1080px;
+  margin: 0 auto;
+  padding: 32px 20px 60px;
+}
+
+.app-selector {
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+  margin-bottom: 24px;
+}
+
+.btn-selector {
+  color: var(--text);
+  text-decoration: none;
+  padding: 8px 14px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  font-size: 14px;
+}
+
+.btn-selector.active {
+  background: var(--accent);
+  color: #101018;
+  border-color: transparent;
+}
+
+.hero {
+  margin-bottom: 24px;
+}
+
+.kicker {
+  text-transform: uppercase;
+  letter-spacing: 2px;
+  font-size: 12px;
+  color: var(--accent-2);
+  margin: 0 0 8px 0;
+}
+
+h1 {
+  font-size: clamp(28px, 4vw, 40px);
+  margin: 0 0 8px 0;
+}
+
+.subtitle {
+  margin: 0;
+  color: var(--muted);
+  max-width: 620px;
+}
+
+.card {
+  background: linear-gradient(145deg, rgba(19, 37, 54, 0.95), rgba(11, 20, 26, 0.95));
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 20px;
+  padding: 24px;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.35);
+}
+
+.card-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 24px;
+}
+
+.upload-panel, .status-panel {
+  background: var(--panel);
+  border-radius: 16px;
+  padding: 20px;
+  min-height: 280px;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+h2 {
+  margin: 0 0 8px 0;
+  font-size: 18px;
+}
+
+.muted {
+  color: var(--muted);
+  margin: 0 0 16px 0;
+  font-size: 14px;
+}
+
+.file-drop {
+  background: var(--panel-2);
+  border-radius: 12px;
+  border: 1px dashed rgba(255, 255, 255, 0.2);
+  padding: 14px;
+  margin-bottom: 12px;
+}
+
+.file-drop input {
+  display: none;
+}
+
+.file-drop label {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  cursor: pointer;
+}
+
+.file-drop span {
+  font-weight: 600;
+}
+
+.file-drop small {
+  color: var(--muted);
+}
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 10px 16px;
+  border-radius: 10px;
+  border: none;
+  background: var(--accent);
+  color: #0b0d0f;
+  font-weight: 700;
+  cursor: pointer;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 10px 20px rgba(245, 179, 1, 0.25);
+}
+
+.btn-ghost {
+  background: transparent;
+  color: var(--text);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.btn-disabled {
+  pointer-events: none;
+  opacity: 0.5;
+}
+
+.status-box {
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 12px;
+  padding: 16px;
+  margin-bottom: 16px;
+}
+
+.status-row {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 8px;
+  font-size: 14px;
+  color: var(--muted);
+}
+
+.status-row strong {
+  color: var(--text);
+}
+
+.progress {
+  height: 16px;
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.bar {
+  height: 100%;
+  background: linear-gradient(90deg, var(--accent), var(--accent-2));
+  text-align: center;
+  font-size: 11px;
+  color: #08110f;
+  font-weight: 700;
+  transition: width 0.3s ease;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.message {
+  margin-top: 12px;
+  font-size: 14px;
+  color: var(--muted);
+}
+
+.message.success {
+  color: var(--accent-2);
+}
+
+.message.error {
+  color: var(--danger);
+}
+
+@media (max-width: 720px) {
+  .app-selector {
+    justify-content: flex-start;
+  }
+
+  .actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+}

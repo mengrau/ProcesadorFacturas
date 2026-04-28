@@ -13,14 +13,16 @@ from typing import Optional
 import flask
 from flask_cors import CORS
 import random
+from facturas_app.config import get_settings
 
 PROC_DEBUG = False
 
-BASE_PATH = r"C:\Users\pracrmofc\OneDrive - Gaseosas Postobon S.A\Escritorio\Automatizaciones_postobon"
-FACTURAS_ROOT = os.path.join(BASE_PATH, "Facturas")
-FACTURAS_PATH = os.path.join(FACTURAS_ROOT, "entrada")
-FACTURAS_PROCESADAS = os.path.join(FACTURAS_ROOT, "salida")
-EXCEL_SALIDA = os.path.join(FACTURAS_ROOT, "procesadas.xlsx")
+_settings = get_settings()
+BASE_PATH = str(_settings.base_path)
+FACTURAS_ROOT = str(_settings.facturas_root)
+FACTURAS_PATH = str(_settings.facturas_path)
+FACTURAS_PROCESADAS = str(_settings.facturas_procesadas)
+EXCEL_SALIDA = str(_settings.excel_salida)
 
 os.makedirs(FACTURAS_PATH, exist_ok=True)
 os.makedirs(FACTURAS_PROCESADAS, exist_ok=True)
@@ -38,12 +40,20 @@ def _env_bool(value, default: bool) -> bool:
     return str(value).strip().lower() in {"1", "true", "yes", "on"}
 
 
-PAGE_TIMEOUT_SECONDS = float(os.getenv("PAGE_TIMEOUT_SECONDS", "10"))
-PAGE_MAX_WORKERS = int(os.getenv("PAGE_MAX_WORKERS", "2"))
-PAGE_TEMP_DIR = os.getenv("PAGE_TEMP_DIR", os.path.join(FACTURAS_ROOT, "temp"))
-PAGE_FALLBACK_ENABLED = _env_bool(os.getenv("PAGE_FALLBACK_ENABLED"), True)
-PAGE_FALLBACK_LIBRARY = os.getenv("PAGE_FALLBACK_LIBRARY", "pymupdf").strip().lower()
-PAGE_KEEP_TEMP_FILES = _env_bool(os.getenv("PAGE_KEEP_TEMP_FILES"), False)
+PAGE_TIMEOUT_SECONDS = float(
+    os.getenv("PAGE_TIMEOUT_SECONDS", str(_settings.page_timeout_seconds))
+)
+PAGE_MAX_WORKERS = int(os.getenv("PAGE_MAX_WORKERS", str(_settings.page_max_workers)))
+PAGE_TEMP_DIR = os.getenv("PAGE_TEMP_DIR", str(_settings.page_temp_dir))
+PAGE_FALLBACK_ENABLED = _env_bool(
+    os.getenv("PAGE_FALLBACK_ENABLED"), _settings.page_fallback_enabled
+)
+PAGE_FALLBACK_LIBRARY = (
+    os.getenv("PAGE_FALLBACK_LIBRARY", _settings.page_fallback_library).strip().lower()
+)
+PAGE_KEEP_TEMP_FILES = _env_bool(
+    os.getenv("PAGE_KEEP_TEMP_FILES"), _settings.page_keep_temp_files
+)
 
 
 def mover_archivo_seguro(origen: str, destino: str, max_intentos: int = 5) -> bool:

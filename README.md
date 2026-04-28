@@ -54,7 +54,7 @@ Facturas/
   - Blueprints de Flask para separar dominios.
   - Endpoint de salud en `/api/health`.
   - Endpoint de facturas modernizado con validacion de entrada y sanitizacion de archivos.
-  - Proxy controlado para endpoints legacy (listas, diferencias, portafolios, dsd).
+  - Proxy controlado para endpoints legacy (dsd).
 
 - Servicios:
   - `InvoiceService` como facade tipada sobre la logica legacy.
