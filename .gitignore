@@ -1,8 +1,8 @@
-# Ignorar carpeta de logs
+# Ignorar logs
 logs/
-logs/app.log
 *.log
-# Ignorar archivos de caché
+
+# Ignorar archivos de cache
 .pytest_cache/
 __pycache__/
 *.pyc
@@ -15,9 +15,8 @@ venv/
 ENV/
 
 .vscode/
-logs/
 
-# Ignorar archivos PDF
+# Ignorar archivos PDF y Excel
 *.pdf
 *.xlsx
 *.xls
@@ -26,7 +25,7 @@ logs/
 .DS_Store
 Thumbs.db
 
-# Ignorar cachés y archivos temporales en subcarpetas
+# Ignorar caches y archivos temporales en subcarpetas
 cod_facturas/__pycache__/
 facturas_app/__pycache__/
 facturas_app/api/__pycache__/
