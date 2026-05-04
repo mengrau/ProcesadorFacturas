@@ -164,7 +164,7 @@ class Settings:
                 default=True,
             ),
             page_timeout_seconds=float(os.getenv("PAGE_TIMEOUT_SECONDS", "20")),
-            page_max_workers=int(os.getenv("PAGE_MAX_WORKERS", "8")),
+            page_max_workers=int(os.getenv("PAGE_MAX_WORKERS", "6")),
             page_temp_dir=Path(os.getenv("PAGE_TEMP_DIR", str(facturas_root / "temp"))),
             page_fallback_enabled=_as_bool(
                 os.getenv("PAGE_FALLBACK_ENABLED"),
