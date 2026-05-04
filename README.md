@@ -132,3 +132,11 @@ Incluye pruebas para:
   - `facturas_app/legacy/server_legacy.py`
 
 Esto permite evolucionar la arquitectura sin romper la operacion actual.
+
+## Documentacion interna
+
+Para entender el funcionamiento antes de modificar codigo, revisa:
+
+- `docs/MAPA_PROYECTO.md`: mapa general del proyecto, responsabilidades por archivo y arquitectura actual.
+- `docs/FLUJO_FACTURAS.md`: flujo paso a paso desde la carga de PDFs hasta la descarga del Excel.
+- `docs/PLAN_REFACTORIZACION.md`: plan recomendado para sacar logica del legacy hacia servicios pequenos y testeables.
