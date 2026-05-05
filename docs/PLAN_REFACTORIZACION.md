@@ -413,6 +413,17 @@ Cuando todo funcione:
 - o convertirlo en wrapper que llame a servicios nuevos,
 - o eliminar funciones duplicadas si ya no se usan.
 
+Estado ejecutado:
+
+- `InvoiceService` ya orquesta con servicios modulares:
+  - `InvoiceValidator`,
+  - `PdfTextExtractor`,
+  - `InvoiceParser`,
+  - `InvoiceExcelRepository`,
+  - `InvoiceFileManager`.
+- `legacy/invoice_legacy.py` se mantiene como compatibilidad y fallback temporal.
+- Se limpiaron imports/configuración legacy que ya no se usaban directamente tras mover PDF, Excel, validación, parsing y movimiento de archivos.
+
 ## 6. Reglas para no romper producción
 
 1. No borrar legacy al inicio.

@@ -9,7 +9,7 @@ Este documento explica paso a paso qué ocurre cuando el usuario sube PDFs desde
 | Frontend FactuVal | `cod_facturas/index.html` | Permite subir PDFs, elegir modo y consultar resultado. |
 | API FactuVal | `facturas_app/api/facturas.py` | Recibe archivos, valida entrada y lanza procesamiento. |
 | Servicio | `facturas_app/services/invoice_service.py` | Orquesta validación, extracción, duplicados y guardado. |
-| Legacy facturas | `facturas_app/legacy/invoice_legacy.py` | Hace validación real, extracción PDF y escritura Excel. |
+| Legacy facturas | `facturas_app/legacy/invoice_legacy.py` | Compatibilidad/fallback temporal; delega en servicios modulares cuando aplica. |
 | Seguridad archivos | `facturas_app/utils/file_security.py` | Sanitiza nombres y evita rutas inseguras. |
 | Configuración | `facturas_app/config.py` | Define carpetas y parámetros del proceso. |
 
@@ -422,7 +422,7 @@ records = self._legacy.extraer_datos_factura(
 
 Aquí está el punto clave:
 
-> La extracción real del texto PDF todavía ocurre en `legacy/invoice_legacy.py`.
+> La extracción de texto PDF ahora vive en `facturas_app/services/pdf_text_extractor.py`; legacy queda como wrapper/fallback.
 
 ## 9. Extracción real en legacy
 

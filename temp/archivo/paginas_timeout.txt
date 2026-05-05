@@ -1,0 +1,3 @@
+file=archivo.pdf
+total_pages=2
+timeout_pages_1_based=2

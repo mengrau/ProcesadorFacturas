@@ -14,6 +14,11 @@ from typing import Any
 from facturas_app.config import Settings, get_settings
 from facturas_app.legacy.bridge import get_invoice_legacy
 from facturas_app.models.dto import ProcessingSummary
+from facturas_app.services.invoice_excel_repository import InvoiceExcelRepository
+from facturas_app.services.invoice_file_manager import InvoiceFileManager
+from facturas_app.services.invoice_parser import InvoiceParser
+from facturas_app.services.invoice_validator import InvoiceValidator
+from facturas_app.services.pdf_text_extractor import PdfTextExtractor
 
 logger = logging.getLogger(__name__)
 
@@ -49,9 +54,21 @@ class InvoiceService:
         self,
         settings: Settings | None = None,
         legacy_module: ModuleType | None = None,
+        validator: InvoiceValidator | None = None,
+        parser: InvoiceParser | None = None,
+        pdf_text_extractor: PdfTextExtractor | None = None,
+        excel_repository: InvoiceExcelRepository | None = None,
+        file_manager: InvoiceFileManager | None = None,
     ) -> None:
         self.settings = settings or get_settings()
         self._legacy = legacy_module or get_invoice_legacy()
+        self.validator = validator or InvoiceValidator()
+        self.parser = parser or InvoiceParser()
+        self.pdf_text_extractor = pdf_text_extractor or PdfTextExtractor()
+        self.excel_repository = excel_repository or InvoiceExcelRepository(
+            self.settings.excel_salida
+        )
+        self._file_manager = file_manager or InvoiceFileManager()
 
     def _configure_legacy_paths(self) -> None:
         """Align legacy constants with centralized settings for deterministic runtime."""
@@ -110,16 +127,16 @@ class InvoiceService:
                     setattr(self._legacy, "print", previous_print)
 
     def _supports_optimized_pipeline(self) -> bool:
-        """Return whether required legacy hooks exist for optimized orchestration."""
-        required_callables = (
-            "_es_factura_valida",
-            "cargar_facturas_existentes",
-            "extraer_datos_factura",
-            "guardar_en_excel",
-            "mover_archivo_seguro",
-        )
+        """Return whether modular services are available for optimized orchestration."""
         return all(
-            callable(getattr(self._legacy, name, None)) for name in required_callables
+            service is not None
+            for service in (
+                self.validator,
+                self.parser,
+                self.pdf_text_extractor,
+                self.excel_repository,
+                self._file_manager,
+            )
         )
 
     def _get_cached_validation(self, pdf_path: Path) -> tuple[bool, str] | None:
@@ -142,11 +159,7 @@ class InvoiceService:
         if cached is not None:
             return cached
 
-        validator = getattr(self._legacy, "_es_factura_valida", None)
-        if not callable(validator):
-            raise RuntimeError("Legacy module does not expose _es_factura_valida")
-
-        raw_result = validator(str(pdf_path))
+        raw_result = self.validator.validate_pdf(pdf_path)
         result = (bool(raw_result[0]), str(raw_result[1]))
         self._set_cached_validation(pdf_path, result)
         return result
@@ -158,13 +171,13 @@ class InvoiceService:
         *,
         max_attempts: int = 5,
     ) -> bool:
-        """Move a file using the resilient legacy mover."""
+        """Move a file using the resilient file manager."""
         destination.parent.mkdir(parents=True, exist_ok=True)
         return bool(
-            self._legacy.mover_archivo_seguro(
+            self._file_manager.move_file_securely(
                 str(source),
                 str(destination),
-                max_intentos=max_attempts,
+                max_attempts=max_attempts,
             )
         )
 
@@ -237,11 +250,21 @@ class InvoiceService:
                 mode,
                 extraction_mode,
             )
-            records = self._legacy.extraer_datos_factura(
+            extraction_result = self.pdf_text_extractor.extract_pdf_pages_with_retries(
                 str(pdf_path),
-                set(),
-                100,
-                extraction_mode,
+                timeout_seconds=self.settings.page_timeout_seconds,
+                max_workers=self.settings.page_max_workers,
+                temp_dir_root=str(self.settings.page_temp_dir),
+                fallback_enabled=self.settings.page_fallback_enabled,
+                source_file=file_name,
+            )
+            records = self.parser.parse_pages(
+                extraction_result["texts"],
+                seen_invoices=set(),
+                pages_per_block=100,
+                mode=extraction_mode,
+                source_file=file_name,
+                total_pages=int(extraction_result["total_pages"]),
             )
             extraction_elapsed = time.perf_counter() - extraction_started_at
             logger.info(
@@ -366,9 +389,7 @@ class InvoiceService:
                 mode,
                 self.settings.excel_salida,
             )
-            loaded = self._legacy.cargar_facturas_existentes(
-                str(self.settings.excel_salida)
-            )
+            loaded = self.excel_repository.load_existing_invoice_numbers()
             if isinstance(loaded, set):
                 seen_invoices.update(loaded)
             elif loaded:
@@ -518,7 +539,7 @@ class InvoiceService:
             mode,
             len(unicos),
         )
-        excel_path = self._legacy.guardar_en_excel(list(unicos.values()), mode)
+        excel_path = self.excel_repository.save(list(unicos.values()), mode)
         logger.info(
             "Invoice stage done. stage=guardar_en_excel mode=%s elapsed=%.3fs excel=%s",
             mode,

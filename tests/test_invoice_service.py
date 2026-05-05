@@ -88,6 +88,86 @@ class FakeOptimizedLegacy:
         return "procesadas.xlsx"
 
 
+class FakeValidatorService:
+    def __init__(self) -> None:
+        self.calls = 0
+
+    def validate_pdf(self, path: Path) -> tuple[bool, str]:
+        self.calls += 1
+        return True, "Archivo válido"
+
+
+class FakePdfTextExtractorService:
+    def __init__(self) -> None:
+        self.calls = 0
+
+    def extract_pdf_pages_with_retries(self, pdf_path: str, **kwargs):
+        self.calls += 1
+        return {
+            "total_pages": 1,
+            "texts": {0: """
+                FACTURA ELECTRÓNICA DE VENTA No. FV-001
+                CLIENTE: 900123456
+                Cliente Test
+                COD. CLIENTE 1001
+                FECHA GENERACIÓN 01/01/2025 10:00:00
+                FECHA DE EXPEDICIÓN 01/01/2025
+                123456 Producto Test UNIDAD 1 1000 1000 19 1190
+                """},
+        }
+
+
+class FakeParserService:
+    def __init__(self) -> None:
+        self.calls = 0
+
+    def parse_pages(self, page_texts, **kwargs) -> list[dict[str, str]]:
+        self.calls += 1
+        return [
+            {
+                "id": "abc123",
+                "numero_factura": "FV-001",
+                "nit_cliente": "900123456",
+                "cod_cliente": "1001",
+                "nombre_cliente": "Cliente Test",
+                "fecha_generacion": "01/01/2025",
+                "fecha_expedicion": "01/01/2025",
+                "referencia": "REF-01",
+                "productos": "Producto Test",
+                "umv": "UNIDAD",
+                "unidades": "1",
+                "precio_base_unitario": "1000",
+                "iva": "19.00",
+                "total": "1190",
+                "estado": "OK",
+            }
+        ]
+
+
+class FakeExcelRepositoryService:
+    def __init__(self) -> None:
+        self.saved_rows = 0
+        self.saved_mode = ""
+        self.loaded = 0
+
+    def load_existing_invoice_numbers(self) -> set[str]:
+        self.loaded += 1
+        return set()
+
+    def save(self, datos: list[dict], mode: str = "acumular") -> str:
+        self.saved_rows = len(datos)
+        self.saved_mode = mode
+        return "procesadas.xlsx"
+
+
+class FailingExcelRepositoryService:
+    def load_existing_invoice_numbers(self) -> set[str]:
+        raise RuntimeError("fallo controlado para probar fallback legacy")
+
+    def save(self, datos: list[dict], mode: str = "acumular") -> str:
+        raise RuntimeError("no debería guardar en este escenario")
+
+
 def _build_settings(tmp_path: Path) -> Settings:
     return Settings(
         base_path=tmp_path,
@@ -108,10 +188,21 @@ def _build_settings(tmp_path: Path) -> Settings:
 
 def test_invoice_service_calls_legacy_module(tmp_path: Path) -> None:
     fake = FakeLegacy()
-    service = InvoiceService(settings=_build_settings(tmp_path), legacy_module=fake)
+    settings = _build_settings(tmp_path)
+    settings.facturas_path.mkdir(parents=True, exist_ok=True)
+    (settings.facturas_path / "factura_fallback.pdf").write_bytes(b"%PDF-1.4 test")
+    service = InvoiceService(
+        settings=settings,
+        legacy_module=fake,
+        validator=FakeValidatorService(),
+        excel_repository=FailingExcelRepositoryService(),
+    )
+    source = tmp_path / "a.pdf"
+    destination = tmp_path / "b.pdf"
+    source.write_bytes(b"%PDF-1.4 test")
 
-    valid, reason = service.validate_invoice_pdf(tmp_path / "a.pdf")
-    moved = service.move_file(tmp_path / "a.pdf", tmp_path / "b.pdf")
+    valid, reason = service.validate_invoice_pdf(source)
+    moved = service.move_file(source, destination)
     result = service.process_invoices("acumular")
 
     assert valid is True
@@ -135,8 +226,12 @@ def test_invoice_service_validates_mode(tmp_path: Path) -> None:
 
 
 def test_validate_invoice_pdf_uses_cache(tmp_path: Path) -> None:
-    fake = FakeOptimizedLegacy()
-    service = InvoiceService(settings=_build_settings(tmp_path), legacy_module=fake)
+    validator = FakeValidatorService()
+    service = InvoiceService(
+        settings=_build_settings(tmp_path),
+        legacy_module=FakeOptimizedLegacy(),
+        validator=validator,
+    )
 
     pdf_path = tmp_path / "validacion.pdf"
     pdf_path.write_bytes(b"%PDF-1.4 test")
@@ -146,19 +241,33 @@ def test_validate_invoice_pdf_uses_cache(tmp_path: Path) -> None:
 
     assert first == (True, "Archivo válido")
     assert second == (True, "Archivo válido")
-    assert fake.validate_calls == 1
+    assert validator.calls == 1
 
 
 def test_invoice_service_optimized_pipeline_runs(tmp_path: Path) -> None:
     fake = FakeOptimizedLegacy()
+    validator = FakeValidatorService()
+    extractor = FakePdfTextExtractorService()
+    parser = FakeParserService()
+    excel_repository = FakeExcelRepositoryService()
     settings = _build_settings(tmp_path)
     settings.facturas_path.mkdir(parents=True, exist_ok=True)
     (settings.facturas_path / "factura_1.pdf").write_bytes(b"%PDF-1.4 test")
 
-    service = InvoiceService(settings=settings, legacy_module=fake)
+    service = InvoiceService(
+        settings=settings,
+        legacy_module=fake,
+        validator=validator,
+        pdf_text_extractor=extractor,
+        parser=parser,
+        excel_repository=excel_repository,
+    )
     result = service.process_invoices("separado")
 
     assert result["facturas_procesadas"] == 1
     assert result["excel_path"] == "procesadas.xlsx"
-    assert fake.saved_rows == 1
-    assert fake.saved_mode == "separado"
+    assert validator.calls == 1
+    assert extractor.calls == 1
+    assert parser.calls == 1
+    assert excel_repository.saved_rows == 1
+    assert excel_repository.saved_mode == "separado"

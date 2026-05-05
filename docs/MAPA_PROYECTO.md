@@ -273,7 +273,7 @@ Funciones importantes:
 
 Conclusión importante:
 
-> `InvoiceService` organiza el flujo, pero **la extracción real del texto del PDF y el guardado del Excel siguen en `legacy/invoice_legacy.py`**.
+> `InvoiceService` organiza el flujo usando servicios modulares: validador, extractor PDF, parser, repositorio Excel y gestor de archivos. `legacy/invoice_legacy.py` queda como compatibilidad/fallback temporal.
 
 ## 9. Modelos
 
