@@ -1,9 +1,11 @@
 # Legacy Layer
 
-Esta carpeta contiene una copia del comportamiento historico del proyecto.
+Esta carpeta mantiene solo compatibilidad historica del procesamiento de
+facturas.
 
-- `invoice_legacy.py`: logica original de procesamiento de facturas.
-- `server_legacy.py`: servidor monolitico original.
+- `invoice_legacy.py`: wrappers de compatibilidad para nombres antiguos.
+- `bridge.py`: carga cacheada del modulo legacy de facturas.
 
-No modificar esta capa salvo correcciones criticas; la evolucion debe hacerse en
-las capas `api`, `services`, `utils` y `models`.
+Los endpoints historicos que no estan en la interfaz actual fueron retirados de
+la app modular. La evolucion debe hacerse en las capas `api`, `services`,
+`utils` y `models`.

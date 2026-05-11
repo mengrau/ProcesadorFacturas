@@ -26,15 +26,6 @@ if __name__ == "__main__":
     print(
         f"  - FactuVal:                 http://localhost:{settings.flask_port}/facturas"
     )
-    print(
-        f"  - Validador de Diferencias: http://localhost:{settings.flask_port}/diferencias"
-    )
-    print(
-        f"  - Validador de Listas:      http://localhost:{settings.flask_port}/listas"
-    )
-    print(
-        f"  - Actualizador de Portafolios: http://localhost:{settings.flask_port}/portafolios"
-    )
     print(f"  - Consulta de pedidos DSD:  http://localhost:{settings.flask_port}/dsd")
     print("=" * 60)
 

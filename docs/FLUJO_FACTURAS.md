@@ -1,595 +1,196 @@
-# Flujo actual de procesamiento de facturas
+# Flujo de Procesamiento de Facturas
 
-Este documento explica paso a paso qué ocurre cuando el usuario sube PDFs desde FactuVal.
+Este documento describe el flujo actual de FactuVal, desde la carga de PDFs
+hasta la descarga de `procesadas.xlsx`.
 
-## 1. Actores principales
+## Actores
 
 | Actor | Archivo | Responsabilidad |
 |---|---|---|
-| Frontend FactuVal | `cod_facturas/index.html` | Permite subir PDFs, elegir modo y consultar resultado. |
-| API FactuVal | `facturas_app/api/facturas.py` | Recibe archivos, valida entrada y lanza procesamiento. |
-| Servicio | `facturas_app/services/invoice_service.py` | Orquesta validación, extracción, duplicados y guardado. |
-| Legacy facturas | `facturas_app/legacy/invoice_legacy.py` | Compatibilidad/fallback temporal; delega en servicios modulares cuando aplica. |
-| Seguridad archivos | `facturas_app/utils/file_security.py` | Sanitiza nombres y evita rutas inseguras. |
-| Configuración | `facturas_app/config.py` | Define carpetas y parámetros del proceso. |
+| Frontend | `cod_facturas/index.html` | Selecciona PDFs, modo y consulta resultado |
+| API | `facturas_app/api/facturas.py` | Recibe archivos y expone estado/descarga |
+| Orquestador | `facturas_app/services/invoice_service.py` | Coordina procesamiento completo |
+| Validador | `facturas_app/services/invoice_validator.py` | Revisa si el PDF parece factura valida |
+| Extractor PDF | `facturas_app/services/pdf_text_extractor.py` | Extrae texto por pagina con timeout |
+| Parser | `facturas_app/services/invoice_parser.py` | Convierte texto en registros |
+| Excel | `facturas_app/services/invoice_excel_repository.py` | Lee y guarda `procesadas.xlsx` |
+| Archivos | `facturas_app/services/invoice_file_manager.py` | Mueve PDFs con reintentos |
 
-## 2. Modos de procesamiento
+`facturas_app/legacy/invoice_legacy.py` queda como compatibilidad y fallback de
+facturas, pero el camino normal usa servicios modulares.
 
-La interfaz permite dos modos:
+## Modos
 
-### Modo `acumular`
+### `acumular`
 
-Objetivo: agregar facturas nuevas al Excel existente.
+- Lee facturas existentes desde `EXCEL_SALIDA`.
+- Evita reprocesar numeros de factura ya vistos.
+- Agrega registros nuevos al Excel.
+- Mueve PDFs correctos a `FACTURAS_PROCESADAS`.
 
-Características:
+### `separado`
 
-- Lee `procesadas.xlsx` si existe.
-- Carga números de factura existentes.
-- Intenta evitar duplicados.
-- Mueve PDFs procesados a carpeta de salida/procesadas.
+- Procesa la carga actual como corrida independiente.
+- Limpia PDFs previos en entrada antes de guardar la nueva carga.
+- Crea un Excel para la corrida actual.
 
-### Modo `separado`
+## Flujo HTTP
 
-Objetivo: procesar la carga actual como una corrida independiente.
-
-Características:
-
-- No usa el Excel existente para filtrar facturas previas.
-- Puede reprocesar las facturas de la sesión.
-- El frontend lo describe como crear/sobrescribir un Excel nuevo.
-
-## 3. Flujo desde el navegador
-
-### Paso 1: usuario abre FactuVal
-
-Ruta:
+1. El usuario abre:
 
 ```text
 GET /facturas
 ```
 
-Archivo servido:
+2. El frontend envia:
 
 ```text
-cod_facturas/index.html
+POST /upload
 ```
 
-El HTML carga:
-
-```text
-/facturas/styles.css
-```
-
-### Paso 2: usuario selecciona archivos
-
-En el navegador:
-
-- Solo acepta PDFs por `accept="application/pdf"`.
-- Permite múltiples archivos.
-- Calcula un tiempo estimado aproximado leyendo marcas internas del PDF como `/Count`, `/Type /Page`, `/Kids`, etc.
-- Si un archivo pesa más de 8 MB, pregunta si se quiere cargar ahora o después.
-
-Esta validación del frontend es solo ayuda visual. La validación real ocurre en backend.
-
-### Paso 3: usuario presiona Cargar
-
-El frontend crea un `FormData` con:
+con:
 
 ```text
 modo = acumular | separado
 files = PDFs seleccionados
 ```
 
-Luego envía:
+3. La API responde rapidamente con `processing_started=true` si hay PDFs
+validos.
+
+4. El frontend consulta:
 
 ```text
-POST /upload
+GET /resultado
 ```
 
-## 4. Flujo en `/upload`
-
-Archivo:
+5. Cuando termina, descarga:
 
 ```text
-facturas_app/api/facturas.py
+GET /descargar_excel?file=procesadas.xlsx
 ```
 
-Función:
+## Upload
+
+`upload_files()` en `api/facturas.py` hace:
+
+1. Revisa que no haya otro proceso activo.
+2. Valida el modo.
+3. Limpia entrada si corresponde.
+4. Obtiene `request.files.getlist("files")`.
+5. Valida extension con `is_allowed_extension()`.
+6. Sanitiza nombre con `sanitize_filename()`.
+7. Resuelve destino con `resolve_safe_path()`.
+8. Guarda el PDF.
+9. Valida factura con `InvoiceService.validate_invoice_pdf()`.
+10. Mueve rechazados a `FACTURAS_RECHAZADOS`.
+11. Lanza un hilo background para procesar validos.
+
+## Procesamiento Background
+
+`_run_background_processing()` crea un `InvoiceService` y llama:
 
 ```python
-upload_files()
+service.process_invoices(mode)
 ```
 
-### Paso 4.1: valida si ya hay proceso activo
-
-El backend mantiene un estado global:
-
-```python
-_processing_state = {"status": "idle"}
-```
-
-Si está en `processing`, responde error `409`:
-
-```json
-{
-  "ok": false,
-  "error": "Ya hay un proceso en ejecución"
-}
-```
-
-### Paso 4.2: lee modo
-
-```python
-mode = request.form.get("modo", "acumular")
-```
-
-Solo permite:
+El estado global queda en uno de estos valores:
 
 ```text
-acumular
-separado
+idle
+processing
+done
+error
 ```
 
-Si llega otro valor, responde `400`.
+## InvoiceService
 
-### Paso 4.3: limpia carpeta si aplica
+`process_invoices()`:
 
-Si:
+1. Valida el modo.
+2. Configura rutas del wrapper legacy para compatibilidad.
+3. Ejecuta el pipeline optimizado modular.
+4. Si ocurre un error inesperado, usa `invoice_legacy.procesar_facturas()` como
+   fallback.
 
-- `modo == "separado"`, o
-- `limpiar == "1"`,
+## Pipeline Optimizado
 
-borra PDFs existentes en `settings.facturas_path`.
+`_run_optimized_pipeline()`:
 
-### Paso 4.4: valida archivos enviados
+1. Lista PDFs en `FACTURAS_PATH`.
+2. Si el modo es `acumular`, carga facturas existentes desde Excel.
+3. Decide cuantos workers usar.
+4. Procesa cada PDF con `_process_single_pdf()`.
+5. Ordena resultados segun el orden de archivos.
+6. Mueve rechazados y errores a sus carpetas.
+7. Filtra duplicados en modo `acumular`.
+8. Deduplica registros por factura, referencia, producto y total.
+9. Guarda el Excel con `InvoiceExcelRepository.save()`.
+10. Devuelve un resumen para `/resultado`.
 
-Obtiene archivos con:
+## Procesamiento por PDF
 
-```python
-files = request.files.getlist("files")
-```
+`_process_single_pdf()`:
 
-Si no llegan archivos, responde `400`.
+1. Valida el PDF con `InvoiceValidator`.
+2. Extrae paginas con `PdfTextExtractor.extract_pdf_pages_with_retries()`.
+3. Parsea paginas con `InvoiceParser.parse_pages()`.
+4. Devuelve registros, tiempo y posible error.
 
-### Paso 4.5: por cada archivo
+## Validacion
 
-Por cada PDF:
+`InvoiceValidator` revisa las primeras paginas y busca indicadores como:
 
-1. Toma nombre original.
-2. Verifica extensión permitida con `is_allowed_extension()`.
-3. Sanitiza nombre con `sanitize_filename()`.
-4. Resuelve ruta segura con `resolve_safe_path()`.
-5. Guarda archivo en carpeta de entrada.
-6. Valida si es factura usando:
+- `POSTOBON`
+- `FACTURA`
+- `CLIENTE:`
+- `COD. CLIENTE`
+- unidades como `PZA`, `UNIDAD`, `SIX`, `Caja`, `BOL`
+- numeros y valores monetarios
 
-```python
-service.validate_invoice_pdf(destination)
-```
+Si no cumple, el archivo va a rechazados.
 
-Internamente eso llama legacy:
+## Extraccion PDF
 
-```python
-legacy._es_factura_valida(...)
-```
+`PdfTextExtractor`:
 
-Si no es válida:
+- Usa `pdfplumber`.
+- Extrae cada pagina en un proceso separado.
+- Aplica timeout por pagina.
+- Reintenta paginas lentas si `PAGE_FALLBACK_ENABLED=true`.
+- Escribe `paginas_timeout.txt` cuando hay paginas con timeout.
 
-- la agrega a `rejected`,
-- la mueve a `facturas_rechazados`,
-- no la procesa.
+## Parsing
 
-Si es válida:
+`InvoiceParser` extrae:
 
-- la agrega a `saved`.
+- numero de factura,
+- NIT,
+- cliente,
+- codigo cliente,
+- fecha generacion,
+- fecha expedicion,
+- referencia,
+- producto,
+- UMV,
+- unidades,
+- precio base,
+- IVA,
+- total,
+- estado.
 
-### Paso 4.6: si no hay archivos válidos
+## Excel
 
-Responde algo como:
-
-```json
-{
-  "ok": true,
-  "status": "ok",
-  "saved": [],
-  "processing_started": false,
-  "run_id": null,
-  "archivos_rechazados": [...],
-  "message": "No hay archivos válidos para procesar"
-}
-```
-
-### Paso 4.7: si hay archivos válidos
-
-Crea un `run_id`:
-
-```python
-run_id = uuid.uuid4().hex
-```
-
-Cambia estado a:
-
-```python
-{
-  "status": "processing",
-  "run_id": run_id,
-  "tiempo_inicio": time.time(),
-  "modo": mode,
-}
-```
-
-Lanza un hilo:
-
-```python
-threading.Thread(
-    target=_run_background_processing,
-    args=(mode, run_id, settings),
-    daemon=True,
-)
-```
-
-Responde inmediatamente al frontend:
-
-```json
-{
-  "ok": true,
-  "status": "ok",
-  "saved": ["factura.pdf"],
-  "processing_started": true,
-  "run_id": "...",
-  "archivos_rechazados": []
-}
-```
-
-## 5. Procesamiento en background
-
-Archivo:
-
-```text
-facturas_app/api/facturas.py
-```
-
-Función:
-
-```python
-_run_background_processing(mode, run_id, settings)
-```
-
-Hace:
-
-```python
-service = InvoiceService(settings=settings)
-result = service.process_invoices(mode)
-```
-
-Si todo sale bien, cambia estado a `done` con resumen.
-
-Si falla, cambia estado a `error`.
-
-## 6. Qué hace `InvoiceService.process_invoices()`
-
-Archivo:
-
-```text
-facturas_app/services/invoice_service.py
-```
-
-Función:
-
-```python
-process_invoices(mode="acumular")
-```
-
-### Paso 6.1: valida modo
-
-Solo acepta:
-
-```text
-acumular
-separado
-```
-
-### Paso 6.2: configura contexto legacy
-
-Usa:
-
-```python
-with self._legacy_runtime_context():
-```
-
-Esto hace dos cosas:
-
-1. Sobrescribe variables globales del legacy con rutas de `Settings`:
-
-```python
-FACTURAS_ROOT
-FACTURAS_PATH
-FACTURAS_PROCESADAS
-EXCEL_SALIDA
-BASE_PATH
-```
-
-2. Opcionalmente silencia `print` del legacy para evitar demasiados logs.
-
-### Paso 6.3: decide pipeline
-
-Si el legacy tiene estas funciones:
-
-```text
-_es_factura_valida
-cargar_facturas_existentes
-extraer_datos_factura
-guardar_en_excel
-mover_archivo_seguro
-```
-
-usa pipeline optimizado:
-
-```python
-self._run_optimized_pipeline(mode)
-```
-
-Si algo falla, cae al legacy completo:
-
-```python
-self._legacy.procesar_facturas(mode)
-```
-
-## 7. Pipeline optimizado actual
-
-Archivo:
-
-```text
-facturas_app/services/invoice_service.py
-```
-
-Función:
-
-```python
-_run_optimized_pipeline(mode)
-```
-
-### Paso 7.1: recoge PDFs
-
-Busca archivos `.pdf` en:
-
-```python
-settings.facturas_path
-```
-
-### Paso 7.2: carga facturas existentes si es acumular
-
-Si `mode == "acumular"`, llama:
-
-```python
-self._legacy.cargar_facturas_existentes(str(self.settings.excel_salida))
-```
-
-Esto devuelve un conjunto de números de factura ya procesadas.
-
-### Paso 7.3: decide paralelismo
-
-Usa `_resolve_workers(total_files)`.
-
-Puede procesar varios PDFs en paralelo con `ThreadPoolExecutor`, dependiendo de:
-
-- cantidad de archivos,
-- `processing_parallel_enabled`,
-- `processing_max_workers`,
-- CPU disponible.
-
-### Paso 7.4: procesa cada PDF
-
-Por cada archivo llama:
-
-```python
-_process_single_pdf(pdf_path, mode)
-```
-
-## 8. Procesamiento de un PDF individual
-
-Archivo:
-
-```text
-facturas_app/services/invoice_service.py
-```
-
-Función:
-
-```python
-_process_single_pdf(pdf_path, mode)
-```
-
-Hace:
-
-1. Valida con:
-
-```python
-self.validate_invoice_pdf(pdf_path)
-```
-
-2. Si no es válida, devuelve resultado rechazado.
-
-3. Si es válida, llama legacy para extraer datos:
-
-```python
-records = self._legacy.extraer_datos_factura(
-    str(pdf_path),
-    set(),
-    100,
-    extraction_mode,
-)
-```
-
-Aquí está el punto clave:
-
-> La extracción de texto PDF ahora vive en `facturas_app/services/pdf_text_extractor.py`; legacy queda como wrapper/fallback.
-
-## 9. Extracción real en legacy
-
-Archivo:
-
-```text
-facturas_app/legacy/invoice_legacy.py
-```
-
-Función principal:
-
-```python
-extraer_datos_factura(pdf_path, facturas_vistas, paginas_por_bloque=100, modo="acumular")
-```
-
-### Paso 9.1: abre PDF
-
-Usa:
-
-```python
-pdfplumber.open(pdf_path)
-```
-
-para conocer número total de páginas.
-
-### Paso 9.2: extrae texto por página
-
-Usa:
-
-```python
-_extract_pages_with_timeout(...)
-```
-
-Esa función crea procesos separados con `multiprocessing` para evitar que una página bloqueada congele todo el procesamiento.
-
-La extracción por página usa:
-
-```python
-_extract_page_text_pdfplumber(pdf_path, page_index)
-```
-
-que hace:
-
-```python
-pdf.pages[page_index].extract_text()
-```
-
-### Paso 9.3: maneja timeout
-
-Si una página se demora demasiado:
-
-- marca estado `TIMEOUT`,
-- termina el proceso,
-- guarda una lista de páginas con timeout en `PAGE_TEMP_DIR`,
-- puede reintentar con timeout más alto si `PAGE_FALLBACK_ENABLED` está activo.
-
-### Paso 9.4: parsea factura
-
-Por cada página con texto:
-
-- busca número de factura,
-- detecta cambio de factura dentro del PDF,
-- extrae cliente,
-- extrae fechas,
-- extrae productos.
-
-Funciones de parsing:
-
-```python
-_extraer_cliente(texto)
-_extraer_fecha_generacion(texto)
-_extraer_fecha_expedicion(texto)
-_extraer_productos(texto)
-```
-
-### Paso 9.5: crea registros
-
-Por cada producto encontrado crea un diccionario con forma aproximada:
-
-```python
-{
-    "id": "...",
-    "numero_factura": "...",
-    "nit_cliente": "...",
-    "nombre_cliente": "...",
-    "cod_cliente": "...",
-    "fecha_generacion": "...",
-    "fecha_expedicion": "...",
-    "referencia": "...",
-    "productos": "...",
-    "umv": "...",
-    "unidades": "...",
-    "precio_base_unitario": "...",
-    "iva": "...",
-    "total": "...",
-    "estado": "OK",
-}
-```
-
-## 10. Regreso al pipeline moderno
-
-Después de extraer cada PDF, `InvoiceService._run_optimized_pipeline()`:
-
-1. Ordena resultados respetando orden de archivos.
-2. Mueve rechazados a `facturas_rechazados`.
-3. Mueve facturas con error a `facturas_errores`.
-4. En modo `acumular`, filtra facturas duplicadas.
-5. Acumula todos los registros válidos.
-6. Quita duplicados por clave:
-
-```python
-(
-    numero_factura,
-    referencia,
-    productos,
-    total,
-)
-```
-
-7. Guarda Excel usando legacy:
-
-```python
-self._legacy.guardar_en_excel(list(unicos.values()), mode)
-```
-
-## 11. Guardado real del Excel
-
-Archivo:
-
-```text
-facturas_app/legacy/invoice_legacy.py
-```
-
-Función:
-
-```python
-guardar_en_excel(datos, modo="acumular")
-```
-
-Responsabilidades:
-
-- Usa `EXCEL_SALIDA` como ruta final.
-- Si está en modo `acumular` y el Excel existe:
-  - intenta abrirlo,
-  - recupera datos existentes,
-  - si hay error/corrupción intenta recuperar con pandas/openpyxl,
-  - crea backup si puede.
-- Crea encabezados si el archivo no existe o se recrea.
-- Deduplica por:
-
-```python
-numero_factura + referencia + productos + total
-```
-
-- Formatea números.
-- Guarda con `openpyxl`.
-
-Columnas generadas:
+`InvoiceExcelRepository` mantiene los encabezados:
 
 ```text
 ID
-Número Factura
+Numero Factura
 NIT Cliente
 Cod Cliente
 Nombre Cliente
-Fecha Generación
-Fecha Expedición
+Fecha Generacion
+Fecha Expedicion
 Referencia
 Producto
 UMV
@@ -600,121 +201,16 @@ Total
 Estado
 ```
 
-## 12. Consulta de resultado desde frontend
+En modo `acumular`, intenta recuperar datos existentes y reconstruir el Excel si
+encuentra corrupcion.
 
-Después del upload, el frontend consulta cada 2 segundos:
+## Carpetas
 
-```text
-GET /resultado
-```
-
-### Si está procesando
-
-Respuesta aproximada:
-
-```json
-{
-  "ok": true,
-  "status": "processing",
-  "tiempo_actual": "10 seg",
-  "tiempo_segundos": 10.2,
-  "run_id": "..."
-}
-```
-
-### Si terminó
-
-Respuesta aproximada:
-
-```json
-{
-  "ok": true,
-  "status": "done",
-  "tiempos": [...],
-  "total": "1 min 20 seg",
-  "excel": "procesadas.xlsx",
-  "archivos_rechazados": [...],
-  "facturas_con_errores": [...],
-  "modo": "acumular",
-  "run_id": "...",
-  "facturas_procesadas": 10,
-  "facturas_nuevas": 8,
-  "facturas_duplicadas": 2
-}
-```
-
-### Si falló
-
-Respuesta con error `500`:
-
-```json
-{
-  "ok": false,
-  "error": "Error durante el procesamiento",
-  "details": {
-    "run_id": "...",
-    "error": "..."
-  }
-}
-```
-
-## 13. Descarga del Excel
-
-Cuando `/resultado` devuelve `done`, el frontend muestra botón de descarga.
-
-Ruta:
-
-```text
-GET /descargar_excel?file=procesadas.xlsx
-```
-
-El backend:
-
-1. Valida extensión permitida.
-2. Sanitiza nombre.
-3. Resuelve ruta segura dentro de `facturas_root`.
-4. Verifica existencia.
-5. Envía archivo como adjunto.
-
-## 14. Carpetas usadas en el flujo
-
-Por defecto, bajo `Facturas/`:
-
-| Carpeta/archivo | Uso |
+| Ruta | Uso |
 |---|---|
-| `Facturas/entrada/` | PDFs cargados pendientes de procesar. |
-| `Facturas/salida/` | PDFs procesados correctamente en modo acumular. |
-| `Facturas/rechazados/` | PDFs que no parecen facturas válidas. |
-| `Facturas/errores/` | PDFs válidos, pero que no pudieron extraerse correctamente. |
-| `Facturas/procesadas.xlsx` | Excel final generado. |
-| `Facturas/temp/` | Archivos temporales relacionados con páginas con timeout. |
-
-## 15. Dónde está el desorden actual
-
-El flujo actual ya tiene un buen API y un buen servicio orquestador, pero todavía depende de legacy para las partes más complejas:
-
-```text
-InvoiceService
-   ├─ organiza proceso
-   ├─ paraleliza
-   ├─ filtra duplicados
-   └─ llama a legacy para:
-       ├─ validar PDF
-       ├─ extraer texto
-       ├─ parsear factura
-       └─ guardar Excel
-```
-
-Por eso, para entender la extracción, no basta con leer `invoice_service.py`; hay que leer también `legacy/invoice_legacy.py`.
-
-## 16. Resumen corto
-
-```text
-1. Usuario sube PDFs desde /facturas.
-2. /upload guarda y valida archivos.
-3. Si hay válidos, inicia hilo background.
-4. InvoiceService coordina procesamiento.
-5. invoice_legacy extrae texto, parsea datos y guarda Excel.
-6. /resultado informa avance o finalización.
-7. /descargar_excel entrega procesadas.xlsx.
-```
+| `FACTURAS_PATH` | PDFs pendientes |
+| `FACTURAS_PROCESADAS` | PDFs procesados |
+| `FACTURAS_RECHAZADOS` | PDFs no validos |
+| `FACTURAS_ERRORES` | PDFs validos que fallaron |
+| `EXCEL_SALIDA` | Excel final |
+| `PAGE_TEMP_DIR` | Temporales de extraccion |

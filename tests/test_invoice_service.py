@@ -179,8 +179,6 @@ def _build_settings(tmp_path: Path) -> Settings:
         facturas_codigo_path=tmp_path / "Facturas" / "cod_facturas",
         excel_salida=tmp_path / "Facturas" / "procesadas.xlsx",
         web_assets_path=tmp_path / "Web",
-        carpeta_base_dif=tmp_path / "dif",
-        ruta_base_jerarquia=tmp_path / "base.xlsx",
         ruta_salida_dsd=tmp_path / "dsd",
         dsd_temp_path=tmp_path / "dsd_temp",
     )

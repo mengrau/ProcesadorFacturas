@@ -1,11 +1,10 @@
 from __future__ import annotations
 
 import importlib
-from pathlib import Path
 
 from facturas_app.app import create_app
 from facturas_app.config import ensure_directories, get_settings
-from facturas_app.legacy.bridge import get_invoice_legacy, get_server_legacy
+from facturas_app.legacy.bridge import get_invoice_legacy
 
 
 def _check_dependency(module_name: str) -> bool:
@@ -56,31 +55,29 @@ def main() -> None:
         f"   [OK] _es_factura_valida disponible: {hasattr(legacy_invoice, '_es_factura_valida')}"
     )
 
-    print("\n4. Verificando modulo legacy de servidor")
-    legacy_server = get_server_legacy()
-    print(f"   [OK] Modulo cargado: {legacy_server.__name__}")
-    print(f"   [OK] app legacy disponible: {hasattr(legacy_server, 'app')}")
-
-    print("\n5. Verificando dependencias principales")
+    print("\n4. Verificando dependencias principales")
     dependencies = [
         "flask",
         "flask_cors",
         "pandas",
         "pdfplumber",
         "openpyxl",
-        "xlsxwriter",
     ]
     for dependency in dependencies:
         marker = "[OK]" if _check_dependency(dependency) else "[ERROR]"
         print(f"   {marker} {dependency}")
 
-    print("\n6. Verificando app factory")
+    print("\n5. Verificando app factory")
     app = create_app(settings)
     print(f"   [OK] Flask app creada: {app is not None}")
     print(f"   [OK] MAX_CONTENT_LENGTH: {app.config.get('MAX_CONTENT_LENGTH')}")
 
-    print("\n7. Validando archivos UI")
+    print("\n6. Validando archivos UI")
     expected_ui_files = [
+        settings.web_assets_path / "index.html",
+        settings.web_assets_path / "styles.css",
+        settings.web_assets_path / "dsd.html",
+        settings.web_assets_path / "dsd.css",
         settings.facturas_codigo_path / "index.html",
         settings.facturas_codigo_path / "styles.css",
     ]

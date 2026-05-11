@@ -88,8 +88,6 @@ class InvoiceService:
             "PAGE_MAX_WORKERS": self.settings.page_max_workers,
             "PAGE_TEMP_DIR": str(self.settings.page_temp_dir),
             "PAGE_FALLBACK_ENABLED": self.settings.page_fallback_enabled,
-            "PAGE_FALLBACK_LIBRARY": self.settings.page_fallback_library,
-            "PAGE_KEEP_TEMP_FILES": self.settings.page_keep_temp_files,
         }
         for attr_name, value in config_overrides.items():
             if hasattr(self._legacy, attr_name):

@@ -45,8 +45,6 @@ class Settings:
     facturas_codigo_path: Path
     excel_salida: Path
     web_assets_path: Path
-    carpeta_base_dif: Path
-    ruta_base_jerarquia: Path
     ruta_salida_dsd: Path
     dsd_temp_path: Path
     max_content_length_mb: int = 100
@@ -59,7 +57,6 @@ class Settings:
     flask_host: str = "0.0.0.0"
     flask_port: int = 5000
     flask_debug: bool = False
-    disable_excel_update: bool = True
     processing_parallel_enabled: bool = True
     processing_max_workers: int = 0
     processing_quiet_legacy_logs: bool = True
@@ -67,8 +64,6 @@ class Settings:
     page_max_workers: int = 5
     page_temp_dir: Path = Path("temp")
     page_fallback_enabled: bool = True
-    page_fallback_library: str = "pymupdf"
-    page_keep_temp_files: bool = False
 
     @property
     def max_content_length_bytes(self) -> int:
@@ -110,23 +105,6 @@ class Settings:
             web_assets_path=Path(
                 os.getenv("WEB_ASSETS_PATH", str(workspace_root / "web"))
             ),
-            carpeta_base_dif=Path(
-                os.getenv(
-                    "CARPETA_BASE_DIF",
-                    str(base_path / "LISTAS DE PRECIOS"),
-                )
-            ),
-            ruta_base_jerarquia=Path(
-                os.getenv(
-                    "RUTA_BASE_JERARQUIA",
-                    str(
-                        base_path
-                        / "Analistas Precios - BASES SAP"
-                        / "MaestraCientes"
-                        / "Base Jerarquia.xlsx"
-                    ),
-                )
-            ),
             ruta_salida_dsd=Path(
                 os.getenv(
                     "RUTA_SALIDA_DSD",
@@ -150,10 +128,6 @@ class Settings:
             flask_host=os.getenv("FLASK_HOST", "0.0.0.0"),
             flask_port=int(os.getenv("FLASK_PORT", "5000")),
             flask_debug=_as_bool(os.getenv("FLASK_DEBUG"), default=False),
-            disable_excel_update=_as_bool(
-                os.getenv("DESHABILITAR_ACTUALIZACION_EXCEL"),
-                default=True,
-            ),
             processing_parallel_enabled=_as_bool(
                 os.getenv("PROCESSING_PARALLEL_ENABLED"),
                 default=True,
@@ -169,11 +143,6 @@ class Settings:
             page_fallback_enabled=_as_bool(
                 os.getenv("PAGE_FALLBACK_ENABLED"),
                 default=True,
-            ),
-            page_fallback_library=os.getenv("PAGE_FALLBACK_LIBRARY", "pymupdf"),
-            page_keep_temp_files=_as_bool(
-                os.getenv("PAGE_KEEP_TEMP_FILES"),
-                default=False,
             ),
         )
 
