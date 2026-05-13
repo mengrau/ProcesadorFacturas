@@ -47,3 +47,21 @@ def dsd_css():
         mimetype="text/css",
         max_age=0,
     )
+
+
+@pages_bp.route("/dividir-pdf", methods=["GET"])
+@pages_bp.route("/dividir-pdf/", methods=["GET"])
+def dividir_pdf_page():
+    settings = _get_settings()
+    return send_from_directory(str(settings.web_assets_path), "dividir-pdf.html")
+
+
+@pages_bp.route("/pdf.css", methods=["GET"])
+def pdf_css():
+    settings = _get_settings()
+    return send_from_directory(
+        str(settings.web_assets_path),
+        "pdf.css",
+        mimetype="text/css",
+        max_age=0,
+    )

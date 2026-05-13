@@ -1,9 +1,10 @@
 # Automatizacion de Facturas - Postobon
 
-Aplicacion local en Flask para operar dos flujos visibles:
+Aplicacion local en Flask para operar tres flujos visibles:
 
 - **FactuVal**: carga facturas PDF, extrae datos y genera `procesadas.xlsx`.
 - **Consulta DSD**: carga Base Jerarquia y genera `Solicitantes_SAP.xlsx`.
+- **Dividir PDF**: carga un PDF y descarga un ZIP con el archivo separado.
 
 La app fue depurada para que el backend exponga solo lo que aparece en el menu
 actual. Los antiguos endpoints de listas, diferencias y portafolios fueron
@@ -18,6 +19,7 @@ Rutas visibles:
 | `/` | Menu principal |
 | `/facturas` | Procesador de facturas PDF |
 | `/dsd` | Consulta pedidos DSD |
+| `/dividir-pdf` | Herramienta para dividir un PDF |
 
 APIs activas:
 
@@ -30,6 +32,7 @@ APIs activas:
 | `/api/dsd/iniciar` | `POST` | Inicia procesamiento DSD |
 | `/api/dsd/estado` | `GET` | Consulta estado DSD |
 | `/api/dsd/descargar` | `GET` | Descarga `Solicitantes_SAP.xlsx` |
+| `/api/pdf/dividir` | `POST` | Divide un PDF y devuelve un ZIP |
 | `/api/health` | `GET` | Healthcheck |
 
 Rutas retiradas:
@@ -54,6 +57,7 @@ facturas_app/app.py
   |-- api/pages.py       Menu, estilos y pagina DSD
   |-- api/facturas.py    API y pagina FactuVal
   |-- api/dsd.py         API del flujo DSD
+  |-- api/pdf_tools.py   API de herramientas PDF
   |-- api/health.py      Healthcheck
   |
   v
@@ -65,6 +69,7 @@ facturas_app/services/
   |-- invoice_excel_repository.py
   |-- invoice_file_manager.py
   |-- dsd_service.py
+  |-- pdf_split_service.py
 ```
 
 La carpeta `facturas_app/legacy/` se conserva solo para compatibilidad del flujo
@@ -89,6 +94,7 @@ Facturas/
       pages.py
       facturas.py
       dsd.py
+      pdf_tools.py
       health.py
     services/
       invoice_service.py
@@ -98,6 +104,7 @@ Facturas/
       invoice_excel_repository.py
       invoice_file_manager.py
       dsd_service.py
+      pdf_split_service.py
     utils/
       file_security.py
       responses.py
@@ -117,6 +124,8 @@ Facturas/
     styles.css
     dsd.html
     dsd.css
+    dividir-pdf.html
+    pdf.css
 
   scripts/
     diagnostico.py
@@ -139,6 +148,7 @@ Dependencias principales:
 - `Flask`
 - `flask-cors`
 - `pdfplumber`
+- `PyMuPDF`
 - `pandas`
 - `openpyxl`
 - `python-dotenv`
@@ -232,6 +242,32 @@ Modos:
 6. Genera `Solicitantes_SAP.xlsx`.
 7. La UI consulta `/api/dsd/estado`.
 8. Descarga con `/api/dsd/descargar`.
+
+## Flujo Dividir PDF
+
+1. El usuario abre `/dividir-pdf`.
+2. Selecciona un archivo `.pdf`.
+3. Ingresa el numero de partes.
+4. El frontend envia `POST /api/pdf/dividir` como `multipart/form-data`:
+   - `file`: PDF de origen.
+   - `partes`: entero mayor a 0.
+5. `PdfSplitService` lee el total de paginas y crea rangos equilibrados.
+6. El backend devuelve un ZIP en memoria como descarga.
+
+Ejemplo con `factura.pdf` de 10 paginas y `partes=3`:
+
+```text
+factura_dividido.zip
+  factura_1-4.pdf
+  factura_5-7.pdf
+  factura_8-10.pdf
+```
+
+Validaciones:
+
+- El archivo debe tener extension `.pdf` y ser un PDF valido.
+- `partes` debe ser un entero mayor a 0.
+- `partes` no puede ser mayor que el numero de paginas del PDF.
 
 ## Seguridad
 

@@ -27,6 +27,9 @@ if __name__ == "__main__":
         f"  - FactuVal:                 http://localhost:{settings.flask_port}/facturas"
     )
     print(f"  - Consulta de pedidos DSD:  http://localhost:{settings.flask_port}/dsd")
+    print(
+        f"  - Dividir PDF:              http://localhost:{settings.flask_port}/dividir-pdf"
+    )
     print("=" * 60)
 
     app.run(

@@ -18,6 +18,8 @@ def _build_settings(tmp_path: Path) -> Settings:
     _write(web_path / "styles.css")
     _write(web_path / "dsd.html")
     _write(web_path / "dsd.css")
+    _write(web_path / "dividir-pdf.html")
+    _write(web_path / "pdf.css")
     _write(facturas_code_path / "index.html")
     _write(facturas_code_path / "styles.css")
 
@@ -43,6 +45,7 @@ def test_current_visual_routes_are_available(tmp_path: Path) -> None:
     assert client.get("/").status_code == 200
     assert client.get("/facturas").status_code == 200
     assert client.get("/dsd").status_code == 200
+    assert client.get("/dividir-pdf").status_code == 200
     assert client.get("/api/health").status_code == 200
 
 

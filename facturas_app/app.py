@@ -10,6 +10,7 @@ from facturas_app.api.dsd import dsd_bp
 from facturas_app.api.facturas import facturas_bp
 from facturas_app.api.health import health_bp
 from facturas_app.api.pages import pages_bp
+from facturas_app.api.pdf_tools import pdf_tools_bp
 from facturas_app.config import Settings, ensure_directories, get_settings
 from facturas_app.logging_config import configure_logging
 from facturas_app.utils.responses import error_response
@@ -39,6 +40,7 @@ def create_app(settings: Settings | None = None) -> Flask:
 
     app.register_blueprint(facturas_bp)
     app.register_blueprint(dsd_bp)
+    app.register_blueprint(pdf_tools_bp)
     app.register_blueprint(health_bp)
     app.register_blueprint(pages_bp)
 
