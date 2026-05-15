@@ -68,7 +68,15 @@ class PdfDeduplicationService:
                         from_page=page_index,
                         to_page=page_index,
                     )
-                output_bytes = output_pdf.tobytes(garbage=4, deflate=True)
+                output_bytes = output_pdf.tobytes(
+                    garbage=4,
+                    clean=True,
+                    deflate=True,
+                    deflate_images=True,
+                    deflate_fonts=True,
+                    use_objstms=True,
+                    compression_effort=9,
+                )
             finally:
                 output_pdf.close()
 
