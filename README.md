@@ -20,6 +20,7 @@ Rutas visibles:
 | `/facturas` | Procesador de facturas PDF |
 | `/dsd` | Consulta pedidos DSD |
 | `/dividir-pdf` | Herramienta para dividir un PDF |
+| `/depurar-pdf` | Herramienta para conservar paginas impares de un PDF |
 
 APIs activas:
 
@@ -33,6 +34,7 @@ APIs activas:
 | `/api/dsd/estado` | `GET` | Consulta estado DSD |
 | `/api/dsd/descargar` | `GET` | Descarga `Solicitantes_SAP.xlsx` |
 | `/api/pdf/dividir` | `POST` | Divide un PDF y devuelve un ZIP |
+| `/api/pdf/depurar` | `POST` | Conserva paginas impares y devuelve un PDF |
 | `/api/health` | `GET` | Healthcheck |
 
 Rutas retiradas:
@@ -70,6 +72,7 @@ facturas_app/services/
   |-- invoice_file_manager.py
   |-- dsd_service.py
   |-- pdf_split_service.py
+  |-- pdf_deduplication_service.py
 ```
 
 La carpeta `facturas_app/legacy/` se conserva solo para compatibilidad del flujo
@@ -125,6 +128,7 @@ Facturas/
     dsd.html
     dsd.css
     dividir-pdf.html
+    depurar-pdf.html
     pdf.css
 
   scripts/
@@ -268,6 +272,30 @@ Validaciones:
 - El archivo debe tener extension `.pdf` y ser un PDF valido.
 - `partes` debe ser un entero mayor a 0.
 - `partes` no puede ser mayor que el numero de paginas del PDF.
+
+## Depurar PDF
+
+1. El usuario abre `/depurar-pdf`.
+2. Selecciona un archivo `.pdf`.
+3. El frontend envia `POST /api/pdf/depurar` como `multipart/form-data`:
+   - `file`: PDF de origen.
+4. `PdfDeduplicationService` crea un PDF nuevo con las paginas 1, 3, 5, 7...
+5. El backend devuelve el PDF en memoria como descarga.
+
+Ejemplo con `factura.pdf` de 6 paginas:
+
+```text
+factura_noduplicados.pdf
+  pagina 1
+  pagina 3
+  pagina 5
+```
+
+Validaciones:
+
+- El archivo debe tener extension `.pdf` y ser un PDF valido.
+- El PDF debe tener al menos una pagina.
+- Los PDFs protegidos con contrasena no se depuran.
 
 ## Seguridad
 

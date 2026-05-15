@@ -23,6 +23,7 @@ def _build_settings(tmp_path: Path) -> Settings:
     _write(web_path / "dsd.html")
     _write(web_path / "dsd.css")
     _write(web_path / "dividir-pdf.html")
+    _write(web_path / "depurar-pdf.html")
     _write(web_path / "pdf.css")
     _write(facturas_code_path / "index.html")
     _write(facturas_code_path / "styles.css")
@@ -48,6 +49,14 @@ def _build_pdf(page_count: int) -> bytes:
         for _ in range(page_count):
             document.new_page()
         return document.tobytes()
+    finally:
+        document.close()
+
+
+def _pdf_page_count(pdf_bytes: bytes) -> int:
+    document = pymupdf.open(stream=pdf_bytes, filetype="pdf")
+    try:
+        return document.page_count
     finally:
         document.close()
 
@@ -109,3 +118,47 @@ def test_split_pdf_endpoint_validates_parts(tmp_path: Path) -> None:
 
     assert response.status_code == 400
     assert response.json["error"] == "El numero de partes debe ser mayor a 0"
+
+
+def test_deduplicate_pdf_endpoint_returns_pdf_with_odd_pages(tmp_path: Path) -> None:
+    app = create_app(_build_settings(tmp_path))
+    client = app.test_client()
+
+    response = client.post(
+        "/api/pdf/depurar",
+        data={
+            "file": (BytesIO(_build_pdf(6)), "demo.pdf"),
+        },
+        content_type="multipart/form-data",
+    )
+
+    assert response.status_code == 200
+    assert response.mimetype == "application/pdf"
+    assert "demo_noduplicados.pdf" in response.headers["Content-Disposition"]
+    assert _pdf_page_count(response.data) == 3
+
+
+def test_deduplicate_pdf_endpoint_validates_missing_file(tmp_path: Path) -> None:
+    app = create_app(_build_settings(tmp_path))
+    client = app.test_client()
+
+    response = client.post("/api/pdf/depurar", data={})
+
+    assert response.status_code == 400
+    assert response.json["error"] == "No se envio ningun archivo PDF"
+
+
+def test_deduplicate_pdf_endpoint_validates_extension(tmp_path: Path) -> None:
+    app = create_app(_build_settings(tmp_path))
+    client = app.test_client()
+
+    response = client.post(
+        "/api/pdf/depurar",
+        data={
+            "file": (BytesIO(b"not a pdf"), "demo.txt"),
+        },
+        content_type="multipart/form-data",
+    )
+
+    assert response.status_code == 400
+    assert response.json["error"] == "El archivo debe ser un PDF (.pdf)"

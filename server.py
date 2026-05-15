@@ -30,6 +30,9 @@ if __name__ == "__main__":
     print(
         f"  - Dividir PDF:              http://localhost:{settings.flask_port}/dividir-pdf"
     )
+    print(
+        f"  - Depurar PDF:              http://localhost:{settings.flask_port}/depurar-pdf"
+    )
     print("=" * 60)
 
     app.run(

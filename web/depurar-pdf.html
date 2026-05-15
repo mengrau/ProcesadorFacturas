@@ -1,0 +1,210 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Depurar PDF</title>
+    <link rel="stylesheet" href="/pdf.css" />
+  </head>
+  <body>
+    <main class="shell">
+      <a class="back" href="/">Volver al menu</a>
+
+      <header class="hero">
+        <p class="eyebrow">Herramientas PDF</p>
+        <h1>Depurar PDF</h1>
+        <p class="sub">
+          Sube un PDF y descarga una copia con paginas 1, 3, 5, 7...
+        </p>
+      </header>
+
+      <section class="card">
+        <div class="panel">
+          <h2>1. Archivo</h2>
+          <p class="muted">Formato permitido: .pdf</p>
+          <div class="file-input">
+            <input id="fileInput" type="file" accept="application/pdf,.pdf" />
+            <label for="fileInput">
+              <span>Seleccionar PDF</span>
+              <small id="fileName">Ningun archivo seleccionado</small>
+            </label>
+          </div>
+          <div class="status">
+            <div class="row">
+              <span>Archivo</span>
+              <strong id="fileStatus">pendiente</strong>
+            </div>
+            <div class="row">
+              <span>Estado</span>
+              <strong id="stateText">listo</strong>
+            </div>
+          </div>
+        </div>
+
+        <div class="panel">
+          <h2>2. Descarga</h2>
+          <p class="muted">
+            El PDF resultante conserva solo paginas impares.
+          </p>
+
+          <div class="actions">
+            <button id="cleanBtn" class="btn">Depurar y descargar</button>
+            <button id="clearBtn" class="btn btn-ghost">Limpiar</button>
+            <a id="downloadBtn" class="btn btn-disabled" href="#">Descargar PDF</a>
+          </div>
+          <div id="message" class="message"></div>
+        </div>
+      </section>
+    </main>
+
+    <script>
+      const fileInput = document.getElementById("fileInput");
+      const fileName = document.getElementById("fileName");
+      const fileStatus = document.getElementById("fileStatus");
+      const stateText = document.getElementById("stateText");
+      const cleanBtn = document.getElementById("cleanBtn");
+      const clearBtn = document.getElementById("clearBtn");
+      const downloadBtn = document.getElementById("downloadBtn");
+      const message = document.getElementById("message");
+
+      let downloadUrl = "";
+
+      function setMessage(text, type) {
+        message.textContent = text || "";
+        message.className = "message" + (type ? " " + type : "");
+      }
+
+      function setBusy(isBusy) {
+        cleanBtn.disabled = isBusy;
+        clearBtn.disabled = isBusy;
+        if (isBusy) {
+          stateText.textContent = "procesando";
+        } else if (stateText.textContent === "procesando") {
+          stateText.textContent = "listo";
+        }
+      }
+
+      function isPdf(file) {
+        if (!file) return false;
+        const hasPdfName = file.name.toLowerCase().endsWith(".pdf");
+        const hasPdfType = !file.type || file.type === "application/pdf";
+        return hasPdfName && hasPdfType;
+      }
+
+      function revokeDownload() {
+        if (downloadUrl) {
+          URL.revokeObjectURL(downloadUrl);
+          downloadUrl = "";
+        }
+        downloadBtn.href = "#";
+        downloadBtn.removeAttribute("download");
+        downloadBtn.classList.add("btn-disabled");
+      }
+
+      function readFilename(disposition) {
+        if (!disposition) return "";
+        const utfMatch = disposition.match(/filename\*=UTF-8''([^;]+)/i);
+        if (utfMatch) return decodeURIComponent(utfMatch[1]);
+        const plainMatch = disposition.match(/filename="?([^";]+)"?/i);
+        return plainMatch ? plainMatch[1] : "";
+      }
+
+      function validateForm() {
+        const file = fileInput.files[0];
+
+        if (!file) {
+          return "Selecciona un archivo PDF primero.";
+        }
+        if (!isPdf(file)) {
+          return "El archivo debe ser un PDF (.pdf).";
+        }
+        return "";
+      }
+
+      async function readApiError(response) {
+        try {
+          const data = await response.json();
+          return data.error || "No se pudo depurar el PDF.";
+        } catch (err) {
+          return "No se pudo depurar el PDF.";
+        }
+      }
+
+      fileInput.addEventListener("change", () => {
+        revokeDownload();
+        const file = fileInput.files[0];
+        fileName.textContent = file ? file.name : "Ningun archivo seleccionado";
+        fileStatus.textContent = file ? "seleccionado" : "pendiente";
+        stateText.textContent = "listo";
+        setMessage("", "");
+
+        if (file && !isPdf(file)) {
+          setMessage("El archivo debe ser un PDF (.pdf).", "error");
+        }
+      });
+
+      cleanBtn.addEventListener("click", async () => {
+        revokeDownload();
+        const validationMessage = validateForm();
+        if (validationMessage) {
+          setMessage(validationMessage, "error");
+          return;
+        }
+
+        const file = fileInput.files[0];
+        const formData = new FormData();
+        formData.append("file", file, file.name);
+
+        setBusy(true);
+        setMessage("Procesando PDF...", "");
+
+        try {
+          const response = await fetch("/api/pdf/depurar", {
+            method: "POST",
+            body: formData,
+          });
+
+          if (!response.ok) {
+            setMessage(await readApiError(response), "error");
+            return;
+          }
+
+          const blob = await response.blob();
+          const fallbackName =
+            file.name.replace(/\.pdf$/i, "") + "_noduplicados.pdf";
+          const filename =
+            readFilename(response.headers.get("Content-Disposition")) ||
+            fallbackName;
+
+          downloadUrl = URL.createObjectURL(blob);
+          downloadBtn.href = downloadUrl;
+          downloadBtn.download = filename;
+          downloadBtn.classList.remove("btn-disabled");
+          downloadBtn.click();
+
+          setMessage("PDF depurado correctamente.", "success");
+          stateText.textContent = "completado";
+        } catch (err) {
+          setMessage("No se pudo conectar con el API.", "error");
+        } finally {
+          setBusy(false);
+        }
+      });
+
+      clearBtn.addEventListener("click", () => {
+        fileInput.value = "";
+        fileName.textContent = "Ningun archivo seleccionado";
+        fileStatus.textContent = "pendiente";
+        stateText.textContent = "listo";
+        setMessage("", "");
+        revokeDownload();
+      });
+
+      downloadBtn.addEventListener("click", (event) => {
+        if (!downloadUrl) {
+          event.preventDefault();
+        }
+      });
+    </script>
+  </body>
+</html>

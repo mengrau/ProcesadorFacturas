@@ -56,6 +56,13 @@ def dividir_pdf_page():
     return send_from_directory(str(settings.web_assets_path), "dividir-pdf.html")
 
 
+@pages_bp.route("/depurar-pdf", methods=["GET"])
+@pages_bp.route("/depurar-pdf/", methods=["GET"])
+def depurar_pdf_page():
+    settings = _get_settings()
+    return send_from_directory(str(settings.web_assets_path), "depurar-pdf.html")
+
+
 @pages_bp.route("/pdf.css", methods=["GET"])
 def pdf_css():
     settings = _get_settings()

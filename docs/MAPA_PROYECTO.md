@@ -1,9 +1,11 @@
 # Mapa del Proyecto
 
-El proyecto es una aplicacion Flask local con dos experiencias visibles:
+El proyecto es una aplicacion Flask local con experiencias visibles para:
 
 - `/facturas`: procesamiento de facturas PDF.
 - `/dsd`: consulta de pedidos DSD.
+- `/dividir-pdf`: division de PDFs.
+- `/depurar-pdf`: depuracion de PDFs duplicados por paginas impares.
 
 Los flujos historicos de listas, diferencias y portafolios fueron retirados de
 la app modular porque ya no aparecen en el menu ni cuentan con interfaz activa.
@@ -27,6 +29,7 @@ facturas_app/
     pages.py
     facturas.py
     dsd.py
+    pdf_tools.py
     health.py
   services/
     invoice_service.py
@@ -36,6 +39,8 @@ facturas_app/
     invoice_excel_repository.py
     invoice_file_manager.py
     dsd_service.py
+    pdf_split_service.py
+    pdf_deduplication_service.py
   utils/
     file_security.py
     responses.py
@@ -87,11 +92,15 @@ Flask.
 | `/` | Menu principal |
 | `/facturas` | FactuVal |
 | `/dsd` | Consulta DSD |
+| `/dividir-pdf` | Dividir PDF |
+| `/depurar-pdf` | Depurar PDF |
 | `/api/health` | Healthcheck |
 | `/upload` | Upload de PDFs |
 | `/resultado` | Estado de facturas |
 | `/descargar_excel` | Descarga de facturas |
 | `/api/dsd/*` | API DSD |
+| `/api/pdf/dividir` | API dividir PDF |
+| `/api/pdf/depurar` | API depurar PDF |
 
 ## Rutas Retiradas
 
